@@ -1,0 +1,6 @@
+{
+    "project_name": "untitled",
+    "train_metadata": "train.csv",
+    "train_image_dir": "train_images",
+    "num_classes": 5
+}
