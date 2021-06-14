@@ -22,6 +22,8 @@ class VisionDataset(data.Dataset):
                 self.meta_df = self.meta_df.iloc[:split].reset_index(drop=True)
 
         files = self.meta_df.iloc[:, 0]
+        assert isinstance(files[0], str), (
+            f'column {self.meta_df.columns[0]} must be of type str')
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
 
         self.labels = self.meta_df.values[:, 1:]
