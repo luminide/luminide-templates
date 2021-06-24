@@ -26,7 +26,7 @@ NUM_CLASSES = {{ cookiecutter.num_classes }}
 logging.basicConfig(
     level=logging.INFO,
     format=('%(asctime)s - %(name)s - ' '%(levelname)s -  %(message)s'))
-logger = logging.getLogger('{{ cookiecutter.project_name }}')
+logger = logging.getLogger('main')
 parser = argparse.ArgumentParser(description='Pattern recognition')
 parser.add_argument(
     '-b', '--batch-size', default=128, type=int, help='mini-batch size')

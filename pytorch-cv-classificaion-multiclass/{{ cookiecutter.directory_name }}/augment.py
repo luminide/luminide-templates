@@ -16,24 +16,21 @@ def make_augmenters(conf):
             A.MedianBlur(blur_limit=3, p=0.1*p),
             A.Blur(blur_limit=3, p=0.1*p),
         ], p=0.2*p),
-        A.IAAPerspective(p=0.2*p),
+        A.Perspective(p=0.2*p),
     ]
 
     if conf.strong_aug:
         aug_list.extend([
-            A.OneOf([
-                A.IAAAdditiveGaussianNoise(),
-                A.GaussNoise(),
-            ], p=0.2*p),
+            A.GaussNoise(p=0.2*p),
             A.OneOf([
                 A.OpticalDistortion(p=0.3*p),
                 A.GridDistortion(p=0.1*p),
-                A.IAAPiecewiseAffine(p=0.3*p),
+                A.PiecewiseAffine(p=0.3*p),
             ], p=0.2*p),
             A.OneOf([
                 A.CLAHE(clip_limit=2, p=0.2*p),
-                A.IAASharpen(p=0.2*p),
-                A.IAAEmboss(p=0.2*p),
+                A.Sharpen(p=0.2*p),
+                A.Emboss(p=0.2*p),
                 A.RandomBrightnessContrast(p=0.2*p),
             ], p=0.3*p),
         ])
