@@ -6,11 +6,6 @@ hp_dict = dict(
 
     crop_width = 384,
     crop_height = 384,
-    # images will be resized to margin*4% larger than crop size
-    margin = 3,
-
-    aug_prob = 0.75,
-    strong_aug = True,
 
     # optimizer settings
     lr = 0.0001,
