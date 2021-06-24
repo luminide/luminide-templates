@@ -7,5 +7,5 @@ print("Running post gen hook...")
 
 # Rename source code directory to 'code/'
 os.chdir(os.pardir)
-os.rename('{{ cookiecutter.project_name }}', 'code')
+os.rename('{{ cookiecutter.directory_name }}', 'code')
 sys.exit(0)
