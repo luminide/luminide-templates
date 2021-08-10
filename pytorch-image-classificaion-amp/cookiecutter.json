@@ -1,0 +1,8 @@
+{
+    "project_description": "Image classification with automatic mixed precision training",
+    "train_metadata": "train.csv",
+    "train_image_dir": "train",
+    "image_column": "image_id",
+    "label_column": "label",
+    "num_classes": 2
+}

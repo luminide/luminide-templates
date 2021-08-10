@@ -8,7 +8,7 @@ def make_augmenters(conf):
     aug_list = [
         A.ShiftScaleRotate(
             shift_limit=0.0625, scale_limit=0.2, rotate_limit=25,
-            interpolation=cv2.INTER_CUBIC, p=p),
+            interpolation=cv2.INTER_INTER, p=p),
         A.RandomCrop(height=conf.crop_height, width=conf.crop_width, always_apply=True),
         A.Flip(p=0.5*p),
         A.OneOf([

@@ -46,15 +46,12 @@ parser.add_argument(
     '-q', '--quick', dest='quick', action='store_true',
     help='use a subset of the data')
 parser.add_argument(
-    '-f', '--f32', dest='f32', action='store_true',
-    help='use 32 bit precision while training')
-parser.add_argument(
     '--input', default='../input', metavar='DIR', help='input directory')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 logger.info('Running on %s', device)
 
 
-def train(loader, model, optimizer, scaler, epoch):
+def train(loader, model, optimizer, epoch):
     loss_func = nn.BCEWithLogitsLoss()
     sigmoid = nn.Sigmoid()
 
@@ -70,12 +67,7 @@ def train(loader, model, optimizer, scaler, epoch):
         # compute output
         optimizer.zero_grad()
         outputs = model(images)
-        if scaler:
-            # use AMP
-            with autocast():
-                loss = loss_func(outputs, labels)
-        else:
-            loss = loss_func(outputs, labels)
+        loss = loss_func(outputs, labels)
 
         if i % skip_interval == 0:
             # skip this minibatch while tuning
@@ -88,14 +80,8 @@ def train(loader, model, optimizer, scaler, epoch):
         loss_sums[0] += loss.item()
         batch_counts[0] += 1
         # compute gradient and do SGD step
-        if scaler:
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
+        loss.backward()
+        optimizer.step()
 
     train_loss = loss_sums[0]/batch_counts[0]
     val_loss = loss_sums[1]/batch_counts[1]
@@ -149,13 +135,12 @@ def main(args_list):
         num_workers=args.workers, worker_init_fn=worker_init_fn)
     writer = SummaryWriter()
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)
-    scaler = None if args.f32 else GradScaler()
     best_loss = None
     for epoch in range(args.epochs):
         # train for one epoch
-        train_loss, val_loss = train(train_loader, model, optimizer, scaler, epoch)
-        writer.add_scalar('training loss', train_loss, epoch)
+        train_loss, val_loss = train(train_loader, model, optimizer, epoch)
         scheduler.step()
+        writer.add_scalar('training loss', train_loss, epoch)
         writer.add_scalar('validation loss', val_loss, epoch)
         writer.flush()
         print(

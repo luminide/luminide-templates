@@ -1,7 +1,0 @@
-{
-    "directory_name": "code",
-    "project_name": "untitled",
-    "train_metadata": "train.csv",
-    "train_image_dir": "train",
-    "num_classes": 2
-}
