@@ -20,6 +20,12 @@
         {
             "name": "PyTorch Image Classification",
             "description": "Basic image classification",
+            "directory": "pytorch-image-classification",
+            "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
+        },
+        {
+            "name": "PyTorch Image Classification",
+            "description": "Basic image classification",
             "directory": "pytorch-image-classification-basic",
             "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
         },
