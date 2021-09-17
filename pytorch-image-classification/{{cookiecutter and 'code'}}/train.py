@@ -1,12 +1,11 @@
-import argparse
 import os
+import argparse
 import logging
 import random
-import cv2
-import yaml
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
+import yaml
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -64,7 +63,6 @@ def train(loader, model, optimizer, scaler, epoch, history):
 def train(loader, model, optimizer, epoch, history):
 {%- endif %}
     loss_func = nn.BCEWithLogitsLoss()
-    sigmoid = nn.Sigmoid()
 
     # skip bprop on some minibatches
     val_percent = 10
@@ -97,8 +95,6 @@ def train(loader, model, optimizer, epoch, history):
             continue
 
         history.append([epoch, i, loss.item(), np.nan])
-        probs = sigmoid(outputs).data.cpu().numpy()
-        preds = probs.round()
         loss_sums[0] += loss.item()
         batch_counts[0] += 1
         # compute gradient and do SGD step
@@ -142,15 +138,15 @@ def main(args_list):
     input_dir = args.input
     model_file = args.resume
     if model_file:
-        logger.info(f'Loading model from {model_file}')
+        logger.info('Loading model from %s', model_file)
         checkpoint = torch.load(model_file)
         conf = Config(checkpoint['hp_dict'])
     else:
         conf = Config(hp_dict)
 
-    conf_file = f'config.yaml'
+    conf_file = 'config.yaml'
     if os.path.exists(conf_file):
-        logger.info(f'Updating config from {conf_file}')
+        logger.info('Updating config from %s', conf_file)
         # read in hyperparameter values
         with open(conf_file) as fd:
             updates = yaml.safe_load(fd)
@@ -163,7 +159,7 @@ def main(args_list):
     if model_file:
         model.load_state_dict(checkpoint['model'])
 
-    train_aug, test_aug = make_augmenters(conf)
+    train_aug, _ = make_augmenters(conf)
 
     # define optimizer
     optimizer = torch.optim.SGD(model.parameters(), conf.lr, conf.momentum, conf.nesterov)

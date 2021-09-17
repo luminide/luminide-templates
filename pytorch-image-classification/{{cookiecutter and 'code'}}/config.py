@@ -23,7 +23,7 @@ hp_dict = dict(
 {%- endif %}
 )
 
-class Config(object):
+class Config():
     def __init__(self, init):
         object.__setattr__(self, "_params", dict())
         self.update(init)
