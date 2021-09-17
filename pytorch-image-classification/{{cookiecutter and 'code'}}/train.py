@@ -3,6 +3,7 @@ import os
 import logging
 import random
 import cv2
+import yaml
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
@@ -58,9 +59,9 @@ logger.info('Running on %s', device)
 
 
 {% if cookiecutter.AMP == "True" -%}
-def train(loader, model, optimizer, scaler, epoch):
+def train(loader, model, optimizer, scaler, epoch, history):
 {% elif cookiecutter.AMP == "False" -%}
-def train(loader, model, optimizer, epoch):
+def train(loader, model, optimizer, epoch, history):
 {%- endif %}
     loss_func = nn.BCEWithLogitsLoss()
     sigmoid = nn.Sigmoid()
@@ -90,10 +91,12 @@ def train(loader, model, optimizer, epoch):
 
         if i % skip_interval == 0:
             # skip this minibatch while tuning
+            history.append([epoch, i, np.nan, loss.item()])
             loss_sums[1] += loss.item()
             batch_counts[1] += 1
             continue
 
+        history.append([epoch, i, loss.item(), np.nan])
         probs = sigmoid(outputs).data.cpu().numpy()
         preds = probs.round()
         loss_sums[0] += loss.item()
@@ -139,12 +142,21 @@ def main(args_list):
     input_dir = args.input
     model_file = args.resume
     if model_file:
-        logger.info(f'loading model from {model_file}')
+        logger.info(f'Loading model from {model_file}')
         checkpoint = torch.load(model_file)
         conf = Config(checkpoint['hp_dict'])
     else:
         conf = Config(hp_dict)
 
+    conf_file = f'config.yaml'
+    if os.path.exists(conf_file):
+        logger.info(f'Updating config from {conf_file}')
+        # read in hyperparameter values
+        with open(conf_file) as fd:
+            updates = yaml.safe_load(fd)
+        conf.update(updates)
+    else:
+        logger.info('Using default config')
     logger.info(conf.get())
     model = ModelWrapper(NUM_CLASSES, conf)
     model = model.to(device)
@@ -169,12 +181,13 @@ def main(args_list):
     scaler = None if args.f32 else GradScaler()
 {%- endif %}
     best_loss = None
+    history = []
     for epoch in range(args.epochs):
         # train for one epoch
 {%- if cookiecutter.AMP == "True" %}
-        train_loss, val_loss = train(train_loader, model, optimizer, scaler, epoch)
+        train_loss, val_loss = train(train_loader, model, optimizer, scaler, epoch, history)
 {%- elif cookiecutter.AMP == "False" %}
-        train_loss, val_loss = train(train_loader, model, optimizer, epoch)
+        train_loss, val_loss = train(train_loader, model, optimizer, epoch, history)
 {%- endif %}
         scheduler.step()
         writer.add_scalar('training loss', train_loss, epoch)
@@ -192,6 +205,8 @@ def main(args_list):
             }
             torch.save(state, 'model.pth')
 
+    df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss'])
+    df.to_csv('history.csv')
     writer.close()
     make_report(model, train_loader, input_dir)
 

@@ -1,0 +1,23 @@
+program: ../code/main.py
+
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  arch:
+    values: ['resnet18', 'resnet50']
+  pretrained:
+    values: [True, False]
+  lr:
+    distribution: uniform
+    min: 0.0001
+    max: 0.001
+  nesterov:
+    values: [True, False]
+
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - "--epochs=3"

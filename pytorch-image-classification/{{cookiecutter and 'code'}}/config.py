@@ -24,10 +24,9 @@ hp_dict = dict(
 )
 
 class Config(object):
-    def __init__(self, hp_dict):
+    def __init__(self, init):
         object.__setattr__(self, "_params", dict())
-        for key in hp_dict:
-            self[key] = hp_dict[key]
+        self.update(init)
 
     def __getitem__(self, key):
         return self._params[key]
@@ -40,3 +39,7 @@ class Config(object):
 
     def get(self):
         return self._params
+
+    def update(self, init):
+        for key in init:
+            self[key] = init[key]
