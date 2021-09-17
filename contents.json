@@ -22,24 +22,6 @@
             "description": "Basic image classification",
             "directory": "pytorch-image-classification",
             "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
-        },
-        {
-            "name": "PyTorch Image Classification",
-            "description": "Basic image classification",
-            "directory": "pytorch-image-classification-basic",
-            "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
-        },
-        {
-            "name": "PyTorch Image Classification with Augmentation",
-            "description": "Image classification with transformations applied to the training data",
-            "directory": "pytorch-image-classification-aug",
-            "tags": [ "PyTorch", "timm", "albumentations", "Computer Vision", "Classification" ]
-        },
-        {
-            "name": "PyTorch Image Classification with AMP",
-            "description": "Image classification with automatic mixed precision training",
-            "directory": "pytorch-image-classification-amp",
-            "tags": [ "PyTorch", "timm", "albumentations", "Computer Vision", "Classification" ]
         }
     ]
 }
