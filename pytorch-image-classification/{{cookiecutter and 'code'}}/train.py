@@ -17,7 +17,7 @@ from torch.cuda.amp import GradScaler, autocast
 from augment import make_augmenters
 from dataset import VisionDataset
 from models import ModelWrapper
-from config import hp_dict, Config
+from config import Config
 from report import plot_images
 
 
@@ -47,11 +47,6 @@ parser.add_argument(
     help='use a subset of the data')
 parser.add_argument(
     '--input', default='../input', metavar='DIR', help='input directory')
-{%- if cookiecutter.AMP == "True" %}
-parser.add_argument(
-    '-f', '--f32', dest='f32', action='store_true',
-    help='use 32 bit precision (instead of AMP) while training')
-{%- endif %}
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 logger.info('Running on %s', device)
@@ -74,16 +69,13 @@ def train(loader, model, optimizer, epoch, history):
         images = images.to(device)
         labels = labels.to(device)
         # compute output
-        optimizer.zero_grad()
-        outputs = model(images)
 {%- if cookiecutter.AMP == "True" %}
-        if scaler:
-            # use AMP
-            with autocast():
-                loss = loss_func(outputs, labels)
-        else:
+        # use AMP
+        with autocast():
+            outputs = model(images)
             loss = loss_func(outputs, labels)
 {%- elif cookiecutter.AMP == "False" %}
+        outputs = model(images)
         loss = loss_func(outputs, labels)
 {%- endif %}
 
@@ -99,18 +91,14 @@ def train(loader, model, optimizer, epoch, history):
         batch_counts[0] += 1
         # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
-        if scaler:
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 {%- elif cookiecutter.AMP == "False" %}
         loss.backward()
         optimizer.step()
 {%- endif %}
+        optimizer.zero_grad()
 
     train_loss = loss_sums[0]/batch_counts[0]
     val_loss = loss_sums[1]/batch_counts[1]
@@ -118,6 +106,7 @@ def train(loader, model, optimizer, epoch, history):
 
 def worker_init_fn(worker_id):
     random.seed(random.randint(0, 2**32) + worker_id)
+    np.random.seed(random.randint(0, 2**32) + worker_id)
 
 def make_report(model, loader, input_dir):
     images, labels = iter(loader).next()
@@ -140,9 +129,9 @@ def main(args_list):
     if model_file:
         logger.info('Loading model from %s', model_file)
         checkpoint = torch.load(model_file)
-        conf = Config(checkpoint['hp_dict'])
+        conf = Config(checkpoint['conf'])
     else:
-        conf = Config(hp_dict)
+        conf = Config()
 
     conf_file = 'config.yaml'
     if os.path.exists(conf_file):
@@ -174,7 +163,7 @@ def main(args_list):
     writer = SummaryWriter()
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
-    scaler = None if args.f32 else GradScaler()
+    scaler = GradScaler()
 {%- endif %}
     best_loss = None
     history = []
@@ -197,7 +186,7 @@ def main(args_list):
             state = {
                 'epoch': epoch, 'model': model.state_dict(),
                 'optimizer' : optimizer.state_dict(), 'arch' : conf.arch,
-                'hp_dict': conf.get()
+                'conf': conf.get()
             }
             torch.save(state, 'model.pth')
 

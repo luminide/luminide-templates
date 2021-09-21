@@ -1,4 +1,4 @@
-hp_dict = dict(
+default_config = dict(
     # this can be any network from the timm library
     arch = 'resnet18',
 
@@ -24,7 +24,9 @@ hp_dict = dict(
 )
 
 class Config():
-    def __init__(self, init):
+    def __init__(self, init=None):
+        if init is None:
+            init = default_config
         object.__setattr__(self, "_params", dict())
         self.update(init)
 
