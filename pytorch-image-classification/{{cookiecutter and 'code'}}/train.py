@@ -12,7 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 from torch import nn
 import torch.utils.data as data
+{%- if cookiecutter.AMP == "True" %}
 from torch.cuda.amp import GradScaler, autocast
+{%- endif %}
 
 from augment import make_augmenters
 from dataset import VisionDataset
@@ -29,9 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger('main')
 parser = argparse.ArgumentParser(description='Pattern recognition')
 parser.add_argument(
-    '-b', '--batch-size', default=128, type=int, help='mini-batch size')
-parser.add_argument(
-    '-j', '--workers', default=mp.cpu_count(), type=int, metavar='N',
+    '-j', '--num-workers', default=mp.cpu_count(), type=int, metavar='N',
     help='number of data loading workers')
 parser.add_argument(
     '--epochs', default=50, type=int, metavar='N',
@@ -51,68 +51,137 @@ parser.add_argument(
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 logger.info('Running on %s', device)
 
-
-{% if cookiecutter.AMP == "True" -%}
-def train(loader, model, optimizer, scaler, epoch, history):
-{% elif cookiecutter.AMP == "False" -%}
-def train(loader, model, optimizer, epoch, history):
-{%- endif %}
-    loss_func = nn.BCEWithLogitsLoss()
-
-    # skip bprop on some minibatches
-    val_percent = 10
-    skip_interval = 100 // val_percent
-    loss_sums = [0, 0]
-    batch_counts = [0, 0]
-    model.train()
-    for i, (images, labels) in enumerate(loader):
-        images = images.to(device)
-        labels = labels.to(device)
-        # compute output
+class Trainer:
+    def __init__(self, model, conf, input_dir, device, num_workers, quick=False):
+        self.model = model
+        self.conf = conf
+        self.input_dir = input_dir
+        self.device = device
+        self.optimizer = torch.optim.SGD(
+            model.parameters(), conf.lr, conf.momentum, conf.nesterov)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            self.optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
-        # use AMP
-        with autocast():
+        self.scaler = GradScaler()
+{%- endif %}
+
+        # data loading code
+        self.create_dataloaders(num_workers, quick)
+
+    def create_dataloaders(self, num_workers, quick):
+        conf = self.conf
+        meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
+        meta_df = pd.read_csv(meta_file)
+        # shuffle
+        meta_df = meta_df.sample(frac=1, random_state=0).reset_index(drop=True)
+        train_aug, test_aug = make_augmenters(conf)
+
+        # split into train and validation sets
+        split = meta_df.shape[0]*80//100
+        train_df = meta_df.iloc[:split].reset_index(drop=True)
+        val_df = meta_df.iloc[split:].reset_index(drop=True)
+        train_dataset = VisionDataset(
+            train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
+            NUM_CLASSES, train_aug, training=True, quick=quick)
+        print(f'{len(train_dataset)} examples in training set')
+        drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
+        # FIXME: set pin_memory to True when spurious warnings are fixed in pytorch
+        self.train_loader = data.DataLoader(
+            train_dataset, batch_size=conf.batch_size,
+            num_workers=num_workers, pin_memory=False,
+            worker_init_fn=worker_init_fn, drop_last=drop_last)
+
+    def fit(self, epochs):
+        best_loss = None
+        history = []
+        writer = SummaryWriter()
+        for epoch in range(epochs):
+            # train for one epoch
+            train_loss, val_loss = self.train_epoch(epoch, history)
+            self.scheduler.step()
+            writer.add_scalar('training loss', train_loss, epoch)
+            writer.add_scalar('validation loss', val_loss, epoch)
+            writer.flush()
+            print(
+                f'Epoch {epoch + 1}: training loss {train_loss:.4f} '
+                f' validation loss {val_loss:.4f}')
+            if best_loss is None or val_loss < best_loss:
+                best_loss = val_loss
+                state = {
+                    'epoch': epoch, 'model': self.model.state_dict(),
+                    'optimizer' : self.optimizer.state_dict(),
+                    'conf': self.conf.get()
+                }
+                torch.save(state, 'model.pth')
+
+        df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss'])
+        df.to_csv('history.csv')
+        writer.close()
+        self.make_report(self.train_loader)
+
+    def train_epoch(self, epoch, history):
+        loss_func = nn.BCEWithLogitsLoss()
+        model = self.model
+        optimizer = self.optimizer
+{%- if cookiecutter.AMP == "True" %}
+        scaler = self.scaler
+{%- endif %}
+        # skip bprop on some minibatches
+        val_percent = 10
+        skip_interval = 100 // val_percent
+        loss_sums = [0, 0]
+        batch_counts = [0, 0]
+        model.train()
+        for i, (images, labels) in enumerate(self.train_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+            # compute output
+{%- if cookiecutter.AMP == "True" %}
+            # use AMP
+            with autocast():
+                outputs = model(images)
+                loss = loss_func(outputs, labels)
+{%- elif cookiecutter.AMP == "False" %}
             outputs = model(images)
             loss = loss_func(outputs, labels)
-{%- elif cookiecutter.AMP == "False" %}
-        outputs = model(images)
-        loss = loss_func(outputs, labels)
 {%- endif %}
 
-        if i % skip_interval == 0:
-            # skip this minibatch while tuning
-            history.append([epoch, i, np.nan, loss.item()])
-            loss_sums[1] += loss.item()
-            batch_counts[1] += 1
-            continue
+            if i % skip_interval == 0:
+                # skip this minibatch while tuning
+                history.append([epoch, i, np.nan, loss.item()])
+                loss_sums[1] += loss.item()
+                batch_counts[1] += 1
+                continue
 
-        history.append([epoch, i, loss.item(), np.nan])
-        loss_sums[0] += loss.item()
-        batch_counts[0] += 1
-        # compute gradient and do SGD step
+            history.append([epoch, i, loss.item(), np.nan])
+            loss_sums[0] += loss.item()
+            batch_counts[0] += 1
+            # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 {%- elif cookiecutter.AMP == "False" %}
-        loss.backward()
-        optimizer.step()
+            loss.backward()
+            optimizer.step()
 {%- endif %}
-        optimizer.zero_grad()
+            optimizer.zero_grad()
 
-    train_loss = loss_sums[0]/batch_counts[0]
-    val_loss = loss_sums[1]/batch_counts[1]
-    return train_loss, val_loss
+        train_loss = loss_sums[0]/batch_counts[0]
+        val_loss = loss_sums[1]/batch_counts[1]
+        return train_loss, val_loss
+
+    def make_report(self, loader):
+        images, labels = iter(loader).next()
+        with torch.no_grad():
+            outputs = self.model(images.to(device)).cpu()
+        plot_images(images, labels, outputs, self.input_dir)
+
 
 def worker_init_fn(worker_id):
     random.seed(random.randint(0, 2**32) + worker_id)
     np.random.seed(random.randint(0, 2**32) + worker_id)
 
-def make_report(model, loader, input_dir):
-    images, labels = iter(loader).next()
-    with torch.no_grad():
-        outputs = model(images.to(device)).cpu()
-    plot_images(images, labels, outputs, input_dir)
 
 def main(args_list):
     if args_list is None:
@@ -148,52 +217,9 @@ def main(args_list):
     if model_file:
         model.load_state_dict(checkpoint['model'])
 
-    train_aug, _ = make_augmenters(conf)
-
-    # define optimizer
-    optimizer = torch.optim.SGD(model.parameters(), conf.lr, conf.momentum, conf.nesterov)
-
-    # data loading code
-    train_dataset = VisionDataset(
-        True, conf, input_dir, '{{ cookiecutter.train_image_dir }}',
-        NUM_CLASSES, train_aug, args.quick)
-    train_loader = data.DataLoader(
-        train_dataset, batch_size=args.batch_size,
-        num_workers=args.workers, worker_init_fn=worker_init_fn)
-    writer = SummaryWriter()
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=conf.gamma)
-{%- if cookiecutter.AMP == "True" %}
-    scaler = GradScaler()
-{%- endif %}
-    best_loss = None
-    history = []
-    for epoch in range(args.epochs):
-        # train for one epoch
-{%- if cookiecutter.AMP == "True" %}
-        train_loss, val_loss = train(train_loader, model, optimizer, scaler, epoch, history)
-{%- elif cookiecutter.AMP == "False" %}
-        train_loss, val_loss = train(train_loader, model, optimizer, epoch, history)
-{%- endif %}
-        scheduler.step()
-        writer.add_scalar('training loss', train_loss, epoch)
-        writer.add_scalar('validation loss', val_loss, epoch)
-        writer.flush()
-        print(
-            f'Epoch {epoch + 1}: training loss {train_loss:.4f} '
-            f' validation loss {val_loss:.4f}')
-        if best_loss is None or val_loss < best_loss:
-            best_loss = val_loss
-            state = {
-                'epoch': epoch, 'model': model.state_dict(),
-                'optimizer' : optimizer.state_dict(), 'arch' : conf.arch,
-                'conf': conf.get()
-            }
-            torch.save(state, 'model.pth')
-
-    df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss'])
-    df.to_csv('history.csv')
-    writer.close()
-    make_report(model, train_loader, input_dir)
+    trainer = Trainer(
+        model, conf, input_dir, device, args.num_workers, quick=args.quick)
+    trainer.fit(args.epochs)
 
 if __name__ == '__main__':
     main(None)

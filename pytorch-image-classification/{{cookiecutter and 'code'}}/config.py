@@ -11,6 +11,7 @@ default_config = dict(
     lr = 0.0001,
     momentum = 0,
     nesterov = False,
+    batch_size = 16,
 
     # scheduler settings
     gamma = 0.96,
