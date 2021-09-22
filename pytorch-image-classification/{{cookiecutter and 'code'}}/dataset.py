@@ -6,31 +6,27 @@ import torch.utils.data as data
 
 
 class VisionDataset(data.Dataset):
-    def __init__(self, training, conf, input_dir, imgs_dir, num_classes, transform, quick):
+    def __init__(
+            self, meta_df, conf, input_dir, imgs_dir,
+            num_classes, transform, training, quick=False):
         self.conf = conf
         self.num_classes = num_classes
         self.transform = transform
-        meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
 
-        self.meta_df = pd.read_csv(meta_file)
-        if training:
-            # shuffle the dataset
-            self.meta_df = self.meta_df.sample(frac=1, random_state=0).reset_index(drop=True)
-            if quick:
-                # train on a subset
-                split = self.meta_df.shape[0]//10
-                self.meta_df = self.meta_df.iloc[:split].reset_index(drop=True)
+        if training and quick:
+            # train on a subset
+            split = meta_df.shape[0]//10
+            meta_df = self.meta_df.iloc[:split].reset_index(drop=True)
 
-        files = self.meta_df['{{ cookiecutter.image_column }}']
+        files = meta_df['{{ cookiecutter.image_column }}']
         assert isinstance(files[0], str), (
-            f'column {self.meta_df.columns[0]} must be of type str')
+            f'column {meta_df.columns[0]} must be of type str')
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
 
-        labels = np.int32(self.meta_df['{{ cookiecutter.label_column }}'].values)
+        labels = np.int32(meta_df['{{ cookiecutter.label_column }}'].values)
         num_samples = len(files)
         self.onehot_labels = np.zeros((num_samples, num_classes), dtype=np.float32)
         self.onehot_labels[np.arange(num_samples), labels] = 1.0
-        print(f'{num_samples} examples')
 
     def __getitem__(self, index):
         conf = self.conf
