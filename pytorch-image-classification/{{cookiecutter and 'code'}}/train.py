@@ -83,13 +83,20 @@ class Trainer:
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             NUM_CLASSES, train_aug, training=True, quick=quick)
+        val_dataset = VisionDataset(
+            val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
+            NUM_CLASSES, test_aug, training=False)
         print(f'{len(train_dataset)} examples in training set')
+        print(f'{len(val_dataset)} examples in validation set')
         drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
         # FIXME: set pin_memory to True when spurious warnings are fixed in pytorch
         self.train_loader = data.DataLoader(
-            train_dataset, batch_size=conf.batch_size,
+            train_dataset, batch_size=conf.batch_size, shuffle=True,
             num_workers=num_workers, pin_memory=False,
             worker_init_fn=worker_init_fn, drop_last=drop_last)
+        self.val_loader = data.DataLoader(
+            val_dataset, batch_size=conf.batch_size, shuffle=False,
+            num_workers=num_workers, pin_memory=False)
 
     def fit(self, epochs):
         best_loss = None
@@ -126,13 +133,30 @@ class Trainer:
 {%- if cookiecutter.AMP == "True" %}
         scaler = self.scaler
 {%- endif %}
-        # skip bprop on some minibatches
-        val_percent = 10
-        skip_interval = 100 // val_percent
-        loss_sums = [0, 0]
-        batch_counts = [0, 0]
+
+        val_iter = iter(self.val_loader)
+        val_interval = len(self.train_loader)//len(self.val_loader)
+        train_loss_list = []
+        val_loss_list = []
         model.train()
-        for i, (images, labels) in enumerate(self.train_loader):
+        for step, (images, labels) in enumerate(self.train_loader):
+            if step % val_interval == 0:
+                model.eval()
+                # collect validation history for tuning
+                try:
+                    with torch.no_grad():
+                        val_images, val_labels = next(val_iter)
+                        val_images = val_images.to(device)
+                        val_labels = val_labels.to(device)
+                        val_outputs = model(val_images)
+                        val_loss = loss_func(val_outputs, val_labels)
+                        history.append([epoch, step, np.nan, val_loss.item()])
+                        val_loss_list.append(val_loss.item())
+                except StopIteration:
+                    pass
+                # switch back to training mode
+                model.train()
+
             images = images.to(device)
             labels = labels.to(device)
             # compute output
@@ -146,16 +170,7 @@ class Trainer:
             loss = loss_func(outputs, labels)
 {%- endif %}
 
-            if i % skip_interval == 0:
-                # skip this minibatch while tuning
-                history.append([epoch, i, np.nan, loss.item()])
-                loss_sums[1] += loss.item()
-                batch_counts[1] += 1
-                continue
-
-            history.append([epoch, i, loss.item(), np.nan])
-            loss_sums[0] += loss.item()
-            batch_counts[0] += 1
+            train_loss_list.append(loss.item())
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
             scaler.scale(loss).backward()
@@ -167,9 +182,9 @@ class Trainer:
 {%- endif %}
             optimizer.zero_grad()
 
-        train_loss = loss_sums[0]/batch_counts[0]
-        val_loss = loss_sums[1]/batch_counts[1]
-        return train_loss, val_loss
+        mean_train_loss = np.array(train_loss_list).mean()
+        mean_val_loss = np.array(val_loss_list).mean()
+        return mean_train_loss, mean_val_loss
 
     def make_report(self, loader):
         images, labels = iter(loader).next()
