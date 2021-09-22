@@ -62,7 +62,9 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
-        self.scaler = GradScaler()
+        self.use_amp = torch.cuda.is_available()
+        if self.use_amp:
+            self.scaler = GradScaler()
 {%- endif %}
 
         # data loading code
@@ -130,9 +132,6 @@ class Trainer:
         loss_func = nn.BCEWithLogitsLoss()
         model = self.model
         optimizer = self.optimizer
-{%- if cookiecutter.AMP == "True" %}
-        scaler = self.scaler
-{%- endif %}
 
         val_iter = iter(self.val_loader)
         val_interval = len(self.train_loader)//len(self.val_loader)
@@ -162,7 +161,7 @@ class Trainer:
             # compute output
 {%- if cookiecutter.AMP == "True" %}
             # use AMP
-            with autocast():
+            with autocast(enabled=self.use_amp):
                 outputs = model(images)
                 loss = loss_func(outputs, labels)
 {%- elif cookiecutter.AMP == "False" %}
@@ -173,9 +172,13 @@ class Trainer:
             train_loss_list.append(loss.item())
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            if self.use_amp:
+                self.scaler.scale(loss).backward()
+                self.scaler.step(optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
 {%- elif cookiecutter.AMP == "False" %}
             loss.backward()
             optimizer.step()
