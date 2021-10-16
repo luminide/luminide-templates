@@ -37,7 +37,7 @@ parser.add_argument(
     '--epochs', default=50, type=int, metavar='N',
     help='number of total epochs to run')
 parser.add_argument(
-    '--seed', default=None, type=int,
+    '--seed', default=0, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
@@ -52,7 +52,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 logger.info('Running on %s', device)
 
 class Trainer:
-    def __init__(self, model, conf, input_dir, device, num_workers, quick=False):
+    def __init__(
+            self, model, conf, input_dir, device, num_workers,
+            checkpoint, quick=False):
         self.model = model
         self.conf = conf
         self.input_dir = input_dir
@@ -66,6 +68,10 @@ class Trainer:
         if self.use_amp:
             self.scaler = GradScaler()
 {%- endif %}
+
+        if checkpoint:
+            self.model.load_state_dict(checkpoint['model'])
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         # data loading code
         self.create_dataloaders(num_workers, quick)
@@ -139,7 +145,7 @@ class Trainer:
         val_loss_list = []
         model.train()
         for step, (images, labels) in enumerate(self.train_loader):
-            if step % val_interval == 0:
+            if (step + 1) % val_interval == 0:
                 model.eval()
                 # collect validation history for tuning
                 try:
@@ -170,6 +176,7 @@ class Trainer:
 {%- endif %}
 
             train_loss_list.append(loss.item())
+            history.append([epoch, step, loss.item(), np.nan])
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
             if self.use_amp:
@@ -218,6 +225,7 @@ def main(args_list):
         checkpoint = torch.load(model_file)
         conf = Config(checkpoint['conf'])
     else:
+        checkpoint = None
         conf = Config()
 
     conf_file = 'config.yaml'
@@ -232,11 +240,10 @@ def main(args_list):
     logger.info(conf.get())
     model = ModelWrapper(NUM_CLASSES, conf)
     model = model.to(device)
-    if model_file:
-        model.load_state_dict(checkpoint['model'])
 
     trainer = Trainer(
-        model, conf, input_dir, device, args.num_workers, quick=args.quick)
+        model, conf, input_dir, device, args.num_workers,
+        checkpoint, quick=args.quick)
     trainer.fit(args.epochs)
 
 if __name__ == '__main__':

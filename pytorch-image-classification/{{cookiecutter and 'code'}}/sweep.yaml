@@ -1,4 +1,4 @@
-program: ../code/main.py
+program: ../code/train.py
 
 method: bayes
 metric:
