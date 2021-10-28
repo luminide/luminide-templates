@@ -4,8 +4,8 @@ default_config = dict(
 
     pretrained = True,
 
-    crop_width = 192,
-    crop_height = 192,
+    crop_width = 128,
+    crop_height = 128,
 
     # optimizer settings
     lr = 0.0001,

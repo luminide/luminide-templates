@@ -37,6 +37,9 @@ parser.add_argument(
     '--epochs', default=50, type=int, metavar='N',
     help='number of total epochs to run')
 parser.add_argument(
+    '-p', '--print-interval', default=200, type=int,
+    metavar='N', help='print interval in batches (default: 200)')
+parser.add_argument(
     '--seed', default=0, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
@@ -54,11 +57,12 @@ logger.info('Running on %s', device)
 class Trainer:
     def __init__(
             self, model, conf, input_dir, device, num_workers,
-            checkpoint, quick=False):
+            checkpoint, print_interval, quick=False):
         self.model = model
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
+        self.print_interval = print_interval
         self.optimizer = torch.optim.SGD(
             model.parameters(), conf.lr, conf.momentum, conf.nesterov)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
@@ -177,6 +181,8 @@ class Trainer:
 
             train_loss_list.append(loss.item())
             history.append([epoch, step, loss.item(), np.nan])
+            if (step + 1) % self.print_interval == 0:
+                print(f'batch {step + 1}: training loss {loss.item():.4f}')
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
             if self.use_amp:
@@ -243,7 +249,7 @@ def main(args_list):
 
     trainer = Trainer(
         model, conf, input_dir, device, args.num_workers,
-        checkpoint, quick=args.quick)
+        checkpoint, args.print_interval, quick=args.quick)
     trainer.fit(args.epochs)
 
 if __name__ == '__main__':
