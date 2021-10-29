@@ -5,5 +5,5 @@
 ### Train
 ```
 cd output
-../code/train.sh
+../code/full.sh
 ```
