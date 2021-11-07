@@ -8,7 +8,7 @@ default_config = dict(
     crop_height = 128,
 
     # optimizer settings
-    lr = 0.0001,
+    lr = 0.01,
     momentum = 0,
     nesterov = False,
     batch_size = 16,
