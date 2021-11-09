@@ -1,33 +1,10 @@
-default_config = dict(
-    # this can be any network from the timm library
-    arch = 'resnet18',
-
-    pretrained = True,
-
-    crop_width = 128,
-    crop_height = 128,
-
-    # optimizer settings
-    lr = 0.01,
-    momentum = 0,
-    nesterov = False,
-    batch_size = 16,
-
-    # scheduler settings
-    gamma = 0.96,
-{%- if cookiecutter.augmentation == "True" %}
-
-    # images will be resized to margin*4% larger than crop size
-    margin = 3,
-    aug_prob = 0.75,
-    strong_aug = True,
-{%- endif %}
-)
+import os
+import yaml
 
 class Config():
     def __init__(self, init=None):
         if init is None:
-            init = default_config
+            init = Config.get_defaults()
         object.__setattr__(self, "_params", dict())
         self.update(init)
 
@@ -46,3 +23,10 @@ class Config():
     def update(self, init):
         for key in init:
             self[key] = init[key]
+
+    @staticmethod
+    def get_defaults():
+        conf_file = '../code/config.yaml'
+        assert os.path.exists(conf_file)
+        with open(conf_file) as fd:
+            return yaml.safe_load(fd)
