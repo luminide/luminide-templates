@@ -1,0 +1,22 @@
+# this can be any network from the timm library
+arch: resnet18
+pretrained: true
+crop_width: 128
+crop_height: 128
+
+# optimizer settings
+lr: 0.01
+momentum: 0
+nesterov: false
+batch_size: 16
+
+# scheduler settings
+gamma: 0.96
+
+{%- if cookiecutter.augmentation == "True" %}
+# images will be resized to margin*4% larger than crop size
+margin: 3
+aug_prob: 0.75
+strong_aug: true
+
+{%- endif %}

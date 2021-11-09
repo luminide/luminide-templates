@@ -259,15 +259,6 @@ def main(args_list):
         checkpoint = None
         conf = Config()
 
-    conf_file = 'config.yaml'
-    if os.path.exists(conf_file):
-        logger.info('Updating config from %s', conf_file)
-        # read in hyperparameter values
-        with open(conf_file) as fd:
-            updates = yaml.safe_load(fd)
-        conf.update(updates)
-    else:
-        logger.info('Using default config')
     logger.info(conf.get())
     model = ModelWrapper(NUM_CLASSES, conf)
     model = model.to(device)
