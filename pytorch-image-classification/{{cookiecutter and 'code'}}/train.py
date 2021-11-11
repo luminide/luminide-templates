@@ -5,7 +5,7 @@ import random
 import multiprocessing as mp
 import numpy as np
 import pandas as pd
-import yaml
+from datetime import datetime
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -113,7 +113,12 @@ class Trainer:
     def fit(self, epochs):
         best_loss = None
         history = []
-        writer = SummaryWriter()
+
+        trial = os.environ.get('TRIAL')
+        prefix = f"trial{trial}-" if trial is not None else ""
+        log_dir = f"runs/{prefix}{datetime.now().strftime('%b%d_%H-%M-%S')}"
+        writer = SummaryWriter(log_dir=log_dir)
+
         for epoch in range(epochs):
             # train for one epoch
             train_loss = self.train_epoch(epoch, history)
