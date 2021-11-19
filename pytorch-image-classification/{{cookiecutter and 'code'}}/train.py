@@ -115,8 +115,8 @@ class Trainer:
         history = []
 
         trial = os.environ.get('TRIAL')
-        prefix = f"trial{trial}-" if trial is not None else ""
-        log_dir = f"runs/{prefix}{datetime.now().strftime('%b%d_%H-%M-%S')}"
+        suffix = f"-trial{trial}" if trial is not None else ""
+        log_dir = f"runs/{datetime.now().strftime('%b%d_%H-%M-%S')}{suffix}"
         writer = SummaryWriter(log_dir=log_dir)
 
         for epoch in range(epochs):
