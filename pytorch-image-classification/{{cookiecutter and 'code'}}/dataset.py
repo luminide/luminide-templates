@@ -23,10 +23,10 @@ class VisionDataset(data.Dataset):
             f'column {meta_df.columns[0]} must be of type str')
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
 
-        labels = np.int32(meta_df['{{ cookiecutter.label_column }}'].values)
+        self.categories = np.int32(meta_df['{{ cookiecutter.label_column }}'].values)
         num_samples = len(files)
         self.onehot_labels = np.zeros((num_samples, num_classes), dtype=np.float32)
-        self.onehot_labels[np.arange(num_samples), labels] = 1.0
+        self.onehot_labels[np.arange(num_samples), self.categories] = 1.0
 
     def __getitem__(self, index):
         conf = self.conf
@@ -34,12 +34,12 @@ class VisionDataset(data.Dataset):
         assert os.path.isfile(filename)
         img = cv2.imread(filename)
 {%- if cookiecutter.augmentation == "True" %}
-        # increase crop size by around (margin*4%)
-        img_width = conf.crop_width + round(conf.margin*conf.crop_width*0.01)*4
-        img_height = conf.crop_height + round(conf.margin*conf.crop_height*0.01)*4
-        img = cv2.resize(img, (img_width, img_height), interpolation=cv2.INTER_AREA)
+        img = cv2.resize(
+            img, (conf.image_size, conf.image_size),
+            interpolation=cv2.INTER_AREA)
 {%- elif cookiecutter.augmentation == "False" %}
-        img = cv2.resize(img, (conf.crop_width, conf.crop_height), interpolation=cv2.INTER_AREA)
+        crop_size = round(conf.image_size*conf.crop_size)
+        img = cv2.resize(img, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
 {%- endif %}
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         if self.transform:
@@ -49,3 +49,6 @@ class VisionDataset(data.Dataset):
 
     def __len__(self):
         return len(self.files)
+
+    def get_categories(self):
+        return self.categories
