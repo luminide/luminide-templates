@@ -27,7 +27,8 @@ NUM_CLASSES = {{ cookiecutter.num_classes }}
 
 logging.basicConfig(
     level=logging.INFO,
-    format=('%(asctime)s - %(name)s - ' '%(levelname)s -  %(message)s'))
+    format=('%(asctime)s - %(levelname)s -  %(message)s'),
+    datefmt='%Y-%m-%d %H:%M')
 logger = logging.getLogger('main')
 parser = argparse.ArgumentParser(description='Pattern recognition')
 parser.add_argument(
@@ -62,6 +63,7 @@ class Trainer:
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
+        self.max_patience = 10
         self.print_interval = print_interval
         self.optimizer = torch.optim.SGD(
             model.parameters(), conf.lr, conf.momentum, conf.nesterov)
@@ -98,8 +100,8 @@ class Trainer:
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             NUM_CLASSES, test_aug, training=False)
-        print(f'{len(train_dataset)} examples in training set')
-        print(f'{len(val_dataset)} examples in validation set')
+        logger.info(f'{len(train_dataset)} examples in training set')
+        logger.info(f'{len(val_dataset)} examples in validation set')
         drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
         # FIXME: set pin_memory to True when spurious warnings are fixed in pytorch
         self.train_loader = data.DataLoader(
@@ -113,6 +115,7 @@ class Trainer:
     def fit(self, epochs):
         best_loss = None
         history = []
+        patience = self.max_patience
 
         trial = os.environ.get('TRIAL')
         suffix = f"-trial{trial}" if trial is not None else ""
@@ -127,9 +130,9 @@ class Trainer:
             writer.add_scalar('training loss', train_loss, epoch)
             writer.add_scalar('validation loss', val_loss, epoch)
             writer.flush()
-            print(
-                f'Epoch {epoch + 1}: training loss {train_loss:.4f} '
-                f' validation loss {val_loss:.4f} validation accuracy {val_acc:.2f}%')
+            logger.info(
+                f'Epoch {epoch + 1}: training loss {train_loss:.5f} '
+                f' validation loss {val_loss:.5f} validation accuracy {val_acc:.2f}%')
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
                 state = {
@@ -138,6 +141,14 @@ class Trainer:
                     'conf': self.conf.get()
                 }
                 torch.save(state, 'model.pth')
+                patience = self.max_patience
+            else:
+                patience -= 1
+                if patience == 0:
+                    logger.info(
+                        f'validation loss did not improve for '
+                        f'{self.max_patience} epochs')
+                    break
 
         df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss'])
         df.to_csv('history.csv')
@@ -193,7 +204,7 @@ class Trainer:
             train_loss_list.append(loss.item())
             history.append([epoch, step, loss.item(), np.nan])
             if (step + 1) % self.print_interval == 0:
-                print(f'batch {step + 1}: training loss {loss.item():.4f}')
+                logger.info(f'batch {step + 1}: training loss {loss.item():.5f}')
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
             if self.use_amp:
@@ -215,7 +226,8 @@ class Trainer:
     def val_epoch(self):
         loss_func = nn.BCEWithLogitsLoss()
         losses = []
-        correct = 0
+        preds = np.zeros(len(self.val_loader.dataset), dtype=np.int32)
+        start_idx = 0
         self.model.eval()
         for images, labels in self.val_loader:
             images = images.to(device)
@@ -226,9 +238,12 @@ class Trainer:
 {%- elif cookiecutter.AMP == "False" %}
             outputs = self.model(images)
 {%- endif %}
-            preds = outputs.argmax(axis=1)
-            correct += (preds == labels[:, 1]).sum()
+            end_idx = start_idx + outputs.shape[0]
+            preds[start_idx:end_idx] = outputs.argmax(axis=1).cpu().numpy()
+            start_idx = end_idx
             losses.append(loss_func(outputs, labels).item())
+        categories = self.val_loader.dataset.get_categories()
+        correct = (preds == categories).sum()
         accuracy = correct*100./len(self.val_loader.dataset)
         return np.mean(losses), accuracy
 

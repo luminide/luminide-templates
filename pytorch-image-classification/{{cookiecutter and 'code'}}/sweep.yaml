@@ -1,11 +1,15 @@
 parameters:
   arch:
-    values: ['resnet18', 'resnet50']
+    values: ['resnet18', 'resnet50', 'seresnext50_32x4d']
   pretrained:
     values: [True, False]
   lr:
-    distribution: uniform
-    min: 0.0001
-    max: 0.001
-  nesterov:
+    values: [0.05, 0.1, 0.2, 0.5]
+  momentum:
+    values: [0.5, 0.9, 0.99]
+  crop_size:
+    values: [0.88, 0.96, 1.0]
+  aug_prob:
+    values: [0.01, 0.05, 0.1]
+  strong_aug:
     values: [True, False]
