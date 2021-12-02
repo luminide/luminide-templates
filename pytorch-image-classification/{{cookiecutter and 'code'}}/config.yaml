@@ -3,21 +3,21 @@ arch: resnet18
 pretrained: true
 
 # resize images to this size
-image_size: 64
+image_size: 128
 # crop to this fraction of image_size
-crop_size: 0.94
+crop_size: 0.8
 
 # optimizer settings
 lr: 0.01
-momentum: 0.9
+momentum: 0
 nesterov: false
-batch_size: 128
+batch_size: 64
 
 # scheduler settings
 gamma: 0.96
 
 {%- if cookiecutter.augmentation == "True" %}
-aug_prob: 0.75
-strong_aug: true
+aug_prob: 0.1
+strong_aug: false
 
 {%- endif %}

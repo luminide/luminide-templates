@@ -38,8 +38,8 @@ parser.add_argument(
     '--epochs', default=50, type=int, metavar='N',
     help='number of total epochs to run')
 parser.add_argument(
-    '-p', '--print-interval', default=200, type=int,
-    metavar='N', help='print interval in batches (default: 200)')
+    '-p', '--print-interval', default=100, type=int,
+    metavar='N', help='print-interval in batches')
 parser.add_argument(
     '--seed', default=0, type=int,
     help='seed for initializing the random number generator')
@@ -129,6 +129,7 @@ class Trainer:
             self.scheduler.step()
             writer.add_scalar('training loss', train_loss, epoch)
             writer.add_scalar('validation loss', val_loss, epoch)
+            writer.add_scalar('validation accuracy', val_acc, epoch)
             writer.flush()
             logger.info(
                 f'Epoch {epoch + 1}: training loss {train_loss:.5f} '
