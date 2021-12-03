@@ -17,6 +17,9 @@ class Config():
     def __getattr__(self, key):
         return self._params[key]
 
+    def __str__(self):
+        return yaml.dump(self.get())
+
     def get(self):
         return self._params
 
