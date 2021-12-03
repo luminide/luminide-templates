@@ -280,7 +280,7 @@ def main(args_list):
         checkpoint = None
         conf = Config()
 
-    logger.info(conf.get())
+    print(conf)
     model = ModelWrapper(NUM_CLASSES, conf)
     model = model.to(device)
 

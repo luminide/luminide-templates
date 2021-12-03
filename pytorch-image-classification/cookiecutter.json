@@ -5,6 +5,7 @@
     "image_column": "image_id",
     "label_column": "label",
     "num_classes": 2,
+    "image_size": 128,
     "augmentation": ["True", "False"],
     "AMP": ["True", "False"]
 }

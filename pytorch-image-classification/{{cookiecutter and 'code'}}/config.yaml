@@ -2,8 +2,8 @@
 arch: resnet18
 pretrained: true
 
-# resize images to this size
-image_size: 128
+# resize images to this size on the fly
+image_size: {{ cookiecutter.image_size }}
 # crop to this fraction of image_size
 crop_size: 0.8
 
