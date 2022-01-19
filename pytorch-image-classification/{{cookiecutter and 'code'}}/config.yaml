@@ -8,9 +8,7 @@ image_size: {{ cookiecutter.image_size }}
 crop_size: 0.8
 
 # optimizer settings
-lr: 0.01
-momentum: 0
-nesterov: false
+lr: 0.001
 batch_size: 64
 
 # scheduler settings

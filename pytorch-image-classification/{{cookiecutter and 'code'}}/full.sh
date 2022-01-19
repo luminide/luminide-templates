@@ -8,4 +8,4 @@
 #  - This script will be run from your output directory
 #  - Imported Data is accessible via the relative path ../input/
 
-python3 ../code/train.py --epochs 10 --seed 0
+python3 ../code/train.py --epochs 30 --seed 0
