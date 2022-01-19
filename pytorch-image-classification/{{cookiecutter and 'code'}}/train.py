@@ -1,6 +1,5 @@
 import os
 import argparse
-import logging
 import random
 import multiprocessing as mp
 import numpy as np
@@ -25,12 +24,7 @@ from report import plot_images
 
 NUM_CLASSES = {{ cookiecutter.num_classes }}
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=('%(asctime)s - %(levelname)s -  %(message)s'),
-    datefmt='%Y-%m-%d %H:%M')
-logger = logging.getLogger('main')
-parser = argparse.ArgumentParser(description='Pattern recognition')
+parser = argparse.ArgumentParser()
 parser.add_argument(
     '-j', '--num-workers', default=mp.cpu_count(), type=int, metavar='N',
     help='number of data loading workers')
@@ -53,7 +47,7 @@ parser.add_argument(
     '--input', default='../input', metavar='DIR', help='input directory')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-logger.info('Running on %s', device)
+print(f'Running on {device}')
 
 class Trainer:
     def __init__(
@@ -65,8 +59,8 @@ class Trainer:
         self.device = device
         self.max_patience = 10
         self.print_interval = print_interval
-        self.optimizer = torch.optim.SGD(
-            model.parameters(), conf.lr, conf.momentum, conf.nesterov)
+        self.optimizer = torch.optim.AdamW(
+            model.parameters(), conf.lr)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
@@ -100,8 +94,8 @@ class Trainer:
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             NUM_CLASSES, test_aug, training=False)
-        logger.info(f'{len(train_dataset)} examples in training set')
-        logger.info(f'{len(val_dataset)} examples in validation set')
+        print(f'{len(train_dataset)} examples in training set')
+        print(f'{len(val_dataset)} examples in validation set')
         drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
         # FIXME: set pin_memory to True when spurious warnings are fixed in pytorch
         self.train_loader = data.DataLoader(
@@ -122,6 +116,7 @@ class Trainer:
         log_dir = f"runs/{datetime.now().strftime('%b%d_%H-%M-%S')}{suffix}"
         writer = SummaryWriter(log_dir=log_dir)
 
+        print('Training in progress...')
         for epoch in range(epochs):
             # train for one epoch
             train_loss = self.train_epoch(epoch, history)
@@ -131,9 +126,9 @@ class Trainer:
             writer.add_scalar('validation loss', val_loss, epoch)
             writer.add_scalar('validation accuracy', val_acc, epoch)
             writer.flush()
-            logger.info(
-                f'Epoch {epoch + 1}: training loss {train_loss:.5f} '
-                f' validation loss {val_loss:.5f} validation accuracy {val_acc:.2f}%')
+            print(f'Epoch {epoch + 1}: training loss {train_loss:.5f}')
+            print(f'Epoch {epoch + 1}: validation loss {val_loss:.5f} validation accuracy {val_acc:.2f}%')
+            history.append([epoch, -1, np.nan, np.nan, val_loss])
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
                 state = {
@@ -146,12 +141,12 @@ class Trainer:
             else:
                 patience -= 1
                 if patience == 0:
-                    logger.info(
+                    print(
                         f'validation loss did not improve for '
                         f'{self.max_patience} epochs')
                     break
 
-        df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss'])
+        df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss', 'epoch_val_loss'])
         df.to_csv('history.csv')
         writer.close()
         self.make_report(self.train_loader)
@@ -182,7 +177,7 @@ class Trainer:
                         val_outputs = model(val_images)
 {%- endif %}
                         val_loss = loss_func(val_outputs, val_labels)
-                        history.append([epoch, step, np.nan, val_loss.item()])
+                        history.append([epoch, step, np.nan, val_loss.item(), np.nan])
                         val_loss_list.append(val_loss.item())
                 except StopIteration:
                     pass
@@ -203,9 +198,9 @@ class Trainer:
 {%- endif %}
 
             train_loss_list.append(loss.item())
-            history.append([epoch, step, loss.item(), np.nan])
+            history.append([epoch, step, loss.item(), np.nan, np.nan])
             if (step + 1) % self.print_interval == 0:
-                logger.info(f'batch {step + 1}: training loss {loss.item():.5f}')
+                print(f'batch {step + 1}: training loss {loss.item():.5f}')
             # compute gradient and do SGD step
 {%- if cookiecutter.AMP == "True" %}
             if self.use_amp:
@@ -273,7 +268,7 @@ def main(args_list):
     input_dir = args.input
     model_file = args.resume
     if model_file:
-        logger.info('Loading model from %s', model_file)
+        print(f'Loading model from {model_file}')
         checkpoint = torch.load(model_file)
         conf = Config(checkpoint['conf'])
     else:
@@ -291,4 +286,4 @@ def main(args_list):
 
 if __name__ == '__main__':
     main(None)
-    logger.info('Done')
+    print('Done')
