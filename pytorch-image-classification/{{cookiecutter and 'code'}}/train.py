@@ -5,6 +5,7 @@ import multiprocessing as mp
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from sklearn.metrics import f1_score
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -59,8 +60,7 @@ class Trainer:
         self.device = device
         self.max_patience = 10
         self.print_interval = print_interval
-        self.optimizer = torch.optim.AdamW(
-            model.parameters(), conf.lr)
+        self.optimizer = torch.optim.AdamW(model.parameters(), conf.lr)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
@@ -93,18 +93,17 @@ class Trainer:
             NUM_CLASSES, train_aug, training=True, quick=quick)
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            NUM_CLASSES, test_aug, training=False)
+            NUM_CLASSES, test_aug, training=False, quick=quick)
         print(f'{len(train_dataset)} examples in training set')
         print(f'{len(val_dataset)} examples in validation set')
         drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
-        # FIXME: set pin_memory to True when spurious warnings are fixed in pytorch
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
-            num_workers=num_workers, pin_memory=False,
+            num_workers=num_workers, pin_memory=True,
             worker_init_fn=worker_init_fn, drop_last=drop_last)
         self.val_loader = data.DataLoader(
             val_dataset, batch_size=conf.batch_size, shuffle=False,
-            num_workers=num_workers, pin_memory=False)
+            num_workers=num_workers, pin_memory=True)
 
     def fit(self, epochs):
         best_loss = None
@@ -120,14 +119,14 @@ class Trainer:
         for epoch in range(epochs):
             # train for one epoch
             train_loss = self.train_epoch(epoch, history)
-            val_loss, val_acc = self.val_epoch()
+            val_loss, val_score = self.val_epoch()
             self.scheduler.step()
-            writer.add_scalar('training loss', train_loss, epoch)
-            writer.add_scalar('validation loss', val_loss, epoch)
-            writer.add_scalar('validation accuracy', val_acc, epoch)
+            writer.add_scalar('Training loss', train_loss, epoch)
+            writer.add_scalar('Validation loss', val_loss, epoch)
+            writer.add_scalar('Validation F1 score', val_score, epoch)
             writer.flush()
             print(f'Epoch {epoch + 1}: training loss {train_loss:.5f}')
-            print(f'Epoch {epoch + 1}: validation loss {val_loss:.5f} validation accuracy {val_acc:.2f}%')
+            print(f'validation F1 score {val_score:.2f} loss {val_loss:.5f}\n')
             history.append([epoch, -1, np.nan, np.nan, val_loss])
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
@@ -146,7 +145,8 @@ class Trainer:
                         f'{self.max_patience} epochs')
                     break
 
-        df = pd.DataFrame(history, columns=['epoch', 'iter', 'train_loss', 'val_loss', 'epoch_val_loss'])
+        df = pd.DataFrame(
+            history, columns=['epoch', 'iter', 'train_loss', 'val_loss', 'epoch_val_loss'])
         df.to_csv('history.csv')
         writer.close()
         self.make_report(self.train_loader)
@@ -158,6 +158,7 @@ class Trainer:
 
         val_iter = iter(self.val_loader)
         val_interval = len(self.train_loader)//len(self.val_loader)
+        assert val_interval > 0
         train_loss_list = []
         val_loss_list = []
         model.train()
@@ -221,27 +222,31 @@ class Trainer:
 
     def val_epoch(self):
         loss_func = nn.BCEWithLogitsLoss()
+        sigmoid = nn.Sigmoid()
         losses = []
-        preds = np.zeros(len(self.val_loader.dataset), dtype=np.int32)
+        all_labels = np.zeros(
+            (len(self.val_loader.dataset), NUM_CLASSES), dtype=np.float32)
+        preds = np.zeros_like(all_labels)
         start_idx = 0
         self.model.eval()
-        for images, labels in self.val_loader:
-            images = images.to(device)
-            labels = labels.to(device)
+        with torch.no_grad():
+            for images, labels in self.val_loader:
+                images = images.to(device)
+                labels = labels.to(device)
 {%- if cookiecutter.AMP == "True" %}
-            with autocast(enabled=self.use_amp):
-                outputs = self.model(images)
+                with autocast(enabled=self.use_amp):
+                    outputs = self.model(images)
 {%- elif cookiecutter.AMP == "False" %}
-            outputs = self.model(images)
+                outputs = self.model(images)
 {%- endif %}
-            end_idx = start_idx + outputs.shape[0]
-            preds[start_idx:end_idx] = outputs.argmax(axis=1).cpu().numpy()
-            start_idx = end_idx
-            losses.append(loss_func(outputs, labels).item())
-        categories = self.val_loader.dataset.get_categories()
-        correct = (preds == categories).sum()
-        accuracy = correct*100./len(self.val_loader.dataset)
-        return np.mean(losses), accuracy
+                end_idx = start_idx + outputs.shape[0]
+                all_labels[start_idx:end_idx] = labels.cpu().numpy()
+                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+                start_idx = end_idx
+                losses.append(loss_func(outputs, labels).item())
+
+        score = f1_score(all_labels, preds, average='micro')
+        return np.mean(losses), score
 
     def make_report(self, loader):
         images, labels = iter(loader).next()
