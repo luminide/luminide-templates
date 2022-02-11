@@ -66,18 +66,20 @@ class Trainer:
 
         self.create_dataloaders(num_workers, quick)
 
-        self.model = ModelWrapper(self.num_classes, conf)
+        self.model = ModelWrapper(conf, self.num_classes)
         self.model = self.model.to(device)
         if checkpoint:
             self.model.load_state_dict(checkpoint['model'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), conf.lr)
+        self.optimizer = self.create_optimizer(conf, self.model)
+        assert  self.optimizer is not None,  f'Unknown optimizer {conf.optim}'
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
 
     def create_dataloaders(self, num_workers, quick):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
+        assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
         df = pd.read_csv(meta_file, dtype=str)
         class_names = get_class_names(df)
         self.num_classes = len(class_names)
@@ -107,6 +109,15 @@ class Trainer:
         self.val_loader = data.DataLoader(
             val_dataset, batch_size=conf.batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=True)
+
+    def create_optimizer(self, conf, model):
+        if conf.optim == 'sgd':
+            return torch.optim.SGD(
+                model.parameters(), lr=conf.lr, momentum=0.9,
+                weight_decay = 0.01, nesterov=True)
+        if conf.optim == 'adam':
+            return torch.optim.AdamW(model.parameters(), lr=conf.lr)
+        return None
 
     def fit(self, epochs):
         best_loss = None
