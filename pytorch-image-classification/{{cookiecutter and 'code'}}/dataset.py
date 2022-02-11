@@ -8,7 +8,7 @@ import torch.utils.data as data
 class VisionDataset(data.Dataset):
     def __init__(
             self, df, conf, input_dir, imgs_dir,
-            num_classes, transform, training, quick=False):
+            class_names, transform, training, quick=False):
         self.conf = conf
         self.transform = transform
 
@@ -22,11 +22,13 @@ class VisionDataset(data.Dataset):
             f'column {df.columns[0]} must be of type str')
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
 
-        labels = df['{{ cookiecutter.label_column }}'].values
+        labels = df['{{ cookiecutter.label_column }}']
         num_samples = len(files)
+        num_classes = len(class_names)
+        class_map = {class_names[i]: i for i in range(num_classes)}
         self.labels = np.zeros((num_samples, num_classes), dtype=np.float32)
         for i in range(num_samples):
-            row_labels = [int(token) for token in labels[i].split(' ')]
+            row_labels = [class_map[token] for token in labels[i].split(' ')]
             self.labels[i, row_labels] = 1.0
 
     def __getitem__(self, index):

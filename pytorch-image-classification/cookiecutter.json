@@ -1,11 +1,11 @@
 {
     "project_description": "Image classification",
     "train_metadata": "train.csv",
-    "train_image_dir": "train",
-    "image_column": "image_id",
-    "label_column": "label",
-    "num_classes": 6,
+    "train_image_dir": "train_images",
+    "image_column": "image",
+    "label_column": "labels",
     "image_size": 128,
     "augmentation": ["True", "False"],
-    "AMP": ["True", "False"]
+    "AMP": ["True", "False"],
+    "Kaggle": ["False", "True"]
 }
