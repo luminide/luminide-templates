@@ -8,6 +8,7 @@ image_size: {{ cookiecutter.image_size }}
 crop_size: 0.8
 
 # optimizer settings
+optim: sgd
 lr: 0.001
 batch_size: 64
 

@@ -5,7 +5,7 @@ import timm
 class ModelWrapper(nn.Module):
 
     def __init__(
-        self, num_classes, conf
+        self, conf, num_classes
     ):
         super().__init__()
         self.model = timm.create_model(

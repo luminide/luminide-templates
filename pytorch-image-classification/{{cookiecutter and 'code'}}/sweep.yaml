@@ -1,6 +1,6 @@
 parameters:
   arch:
-    values: ['resnet18', 'resnet50', 'seresnext50_32x4d']
+    values: ['resnet18', 'resnet50', 'efficientnet_b3', 'seresnext50_32x4d']
   pretrained:
     values: [True, False]
   lr:
@@ -12,6 +12,8 @@ parameters:
   crop_size:
     values: [0.8, 0.96, 1.0]
   aug_prob:
-    values: [0.01, 0.1, 0.8]
+    distribution: uniform
+    min: 0.0
+    max: 0.95
   strong_aug:
     values: [True, False]
