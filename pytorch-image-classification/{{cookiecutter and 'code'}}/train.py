@@ -16,14 +16,13 @@ import torch.utils.data as data
 from torch.cuda.amp import GradScaler, autocast
 {%- endif %}
 
-from augment import make_augmenters
+from augment import make_train_augmenter
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
 from report import plot_images
+from util import get_class_names, make_test_augmenter
 
-
-NUM_CLASSES = {{ cookiecutter.num_classes }}
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -52,48 +51,52 @@ print(f'Running on {device}')
 
 class Trainer:
     def __init__(
-            self, model, conf, input_dir, device, num_workers,
+            self, conf, input_dir, device, num_workers,
             checkpoint, print_interval, quick=False):
-        self.model = model
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
         self.max_patience = 10
         self.print_interval = print_interval
-        self.optimizer = torch.optim.AdamW(model.parameters(), conf.lr)
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            self.optimizer, gamma=conf.gamma)
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
         if self.use_amp:
             self.scaler = GradScaler()
 {%- endif %}
 
+        self.create_dataloaders(num_workers, quick)
+
+        self.model = ModelWrapper(self.num_classes, conf)
+        self.model = self.model.to(device)
         if checkpoint:
             self.model.load_state_dict(checkpoint['model'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
-
-        # data loading code
-        self.create_dataloaders(num_workers, quick)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), conf.lr)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            self.optimizer, gamma=conf.gamma)
 
     def create_dataloaders(self, num_workers, quick):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
-        meta_df = pd.read_csv(meta_file)
+        df = pd.read_csv(meta_file, dtype=str)
+        class_names = get_class_names(df)
+        self.num_classes = len(class_names)
+
         # shuffle
-        meta_df = meta_df.sample(frac=1, random_state=0).reset_index(drop=True)
-        train_aug, test_aug = make_augmenters(conf)
+        df = df.sample(frac=1, random_state=0).reset_index(drop=True)
+        train_aug = make_train_augmenter(conf)
+        test_aug = make_test_augmenter(conf)
 
         # split into train and validation sets
-        split = meta_df.shape[0]*80//100
-        train_df = meta_df.iloc[:split].reset_index(drop=True)
-        val_df = meta_df.iloc[split:].reset_index(drop=True)
+        split = df.shape[0]*80//100
+        train_df = df.iloc[:split].reset_index(drop=True)
+        val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            NUM_CLASSES, train_aug, training=True, quick=quick)
+            class_names, train_aug, training=True, quick=quick)
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            NUM_CLASSES, test_aug, training=False, quick=quick)
+            class_names, test_aug, training=False, quick=quick)
         print(f'{len(train_dataset)} examples in training set')
         print(f'{len(val_dataset)} examples in validation set')
         drop_last = True if len(train_dataset) % conf.batch_size == 1 else False
@@ -225,7 +228,7 @@ class Trainer:
         sigmoid = nn.Sigmoid()
         losses = []
         all_labels = np.zeros(
-            (len(self.val_loader.dataset), NUM_CLASSES), dtype=np.float32)
+            (len(self.val_loader.dataset), self.num_classes), dtype=np.float32)
         preds = np.zeros_like(all_labels)
         start_idx = 0
         self.model.eval()
@@ -281,11 +284,8 @@ def main(args_list):
         conf = Config()
 
     print(conf)
-    model = ModelWrapper(NUM_CLASSES, conf)
-    model = model.to(device)
-
     trainer = Trainer(
-        model, conf, input_dir, device, args.num_workers,
+        conf, input_dir, device, args.num_workers,
         checkpoint, args.print_interval, quick=args.quick)
     trainer.fit(args.epochs)
 
