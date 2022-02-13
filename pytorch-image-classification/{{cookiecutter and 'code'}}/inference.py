@@ -1,8 +1,8 @@
 import os
-import numpy as np
-import pandas as pd
 from glob import glob
 import multiprocessing as mp
+import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 import torch.utils.data as data
@@ -27,7 +27,7 @@ def create_test_loader(conf, input_dir, class_names):
     test_df['labels'] = class_names[0]
     test_dataset = VisionDataset(
         test_df, conf, input_dir, image_dir,
-        class_names, test_aug, training=False)
+        class_names, test_aug)
     print(f'{len(test_dataset)} examples in test set')
     loader = data.DataLoader(
         test_dataset, batch_size=conf.batch_size, shuffle=False,

@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot as plt
 
-def plot_images(images, labels, outputs, input_dir):
+def plot_images(images, labels, outputs):
     num_images = min(12, images.shape[0])
     images = images[:num_images]
     labels = np.argmax(labels[:num_images], axis=1)

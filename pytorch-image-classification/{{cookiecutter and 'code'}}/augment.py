@@ -43,8 +43,8 @@ def make_train_augmenter(conf):
         ])
 
     aug_list.extend([
-            A.Normalize(),
-            ToTensorV2()
+        A.Normalize(),
+        ToTensorV2()
     ])
 
     return A.Compose(aug_list)
