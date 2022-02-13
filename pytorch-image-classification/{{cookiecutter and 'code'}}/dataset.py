@@ -1,14 +1,13 @@
 import os
 import cv2
 import numpy as np
-import pandas as pd
 import torch.utils.data as data
 
 
 class VisionDataset(data.Dataset):
     def __init__(
             self, df, conf, input_dir, imgs_dir,
-            class_names, transform, training, quick=False):
+            class_names, transform, quick=False):
         self.conf = conf
         self.transform = transform
 

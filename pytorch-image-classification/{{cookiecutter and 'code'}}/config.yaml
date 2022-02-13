@@ -10,10 +10,10 @@ crop_size: 0.8
 # optimizer settings
 optim: sgd
 lr: 0.001
-batch_size: 64
+batch_size: 32
 
 # scheduler settings
-gamma: 0.96
+gamma: 0.99
 
 {%- if cookiecutter.augmentation == "True" %}
 aug_prob: 0.1
