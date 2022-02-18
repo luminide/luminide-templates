@@ -7,14 +7,15 @@ import torch.utils.data as data
 class VisionDataset(data.Dataset):
     def __init__(
             self, df, conf, input_dir, imgs_dir,
-            class_names, transform, quick=False):
+            class_names, transform, subset=100):
         self.conf = conf
         self.transform = transform
 
-        if quick:
+        if subset != 100:
+            assert subset < 100
             # train and validate on subsets
-            split = df.shape[0]//10
-            df = df.iloc[:split].reset_index(drop=True)
+            num_rows = df.shape[0]*subset//100
+            df = df.iloc[:num_rows]
 
         files = df['{{ cookiecutter.image_column }}']
         assert isinstance(files[0], str), (

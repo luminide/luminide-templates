@@ -32,8 +32,8 @@ parser.add_argument(
     '--epochs', default=40, type=int, metavar='N',
     help='number of total epochs to run')
 parser.add_argument(
-    '-p', '--print-interval', default=100, type=int,
-    metavar='N', help='print-interval in batches')
+    '-p', '--print-interval', default=100, type=int, metavar='N',
+    help='print-interval in batches')
 parser.add_argument(
     '--seed', default=0, type=int,
     help='seed for initializing the random number generator')
@@ -41,10 +41,11 @@ parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
     help='path to saved model')
 parser.add_argument(
-    '-q', '--quick', dest='quick', action='store_true',
-    help='use a subset of the data')
+    '-s', '--subset', default=100, type=int, metavar='N',
+    help='use a percentage of the data for training and validation')
 parser.add_argument(
-    '--input', default='../input', metavar='DIR', help='input directory')
+    '--input', default='../input', metavar='DIR',
+    help='input directory')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
@@ -52,7 +53,7 @@ print(f'Running on {device}')
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval, quick=False):
+            checkpoint, print_interval, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
@@ -64,7 +65,7 @@ class Trainer:
             self.scaler = GradScaler()
 {%- endif %}
 
-        self.create_dataloaders(num_workers, quick)
+        self.create_dataloaders(num_workers, subset)
 
         self.model = ModelWrapper(conf, self.num_classes)
         self.model = self.model.to(device)
@@ -76,7 +77,7 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
 
-    def create_dataloaders(self, num_workers, quick):
+    def create_dataloaders(self, num_workers, subset):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
@@ -95,10 +96,10 @@ class Trainer:
         val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, train_aug, quick=quick)
+            class_names, train_aug, subset)
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, test_aug, quick=quick)
+            class_names, test_aug, subset)
         print(f'{len(train_dataset)} examples in training set')
         print(f'{len(val_dataset)} examples in validation set')
         drop_last = (len(train_dataset) % conf.batch_size) == 1
@@ -280,6 +281,8 @@ def main(args_list):
     else:
         args = parser.parse_args(args=args_list)
 
+    if args.subset != 100:
+        print(f'WARNING: {args.subset}% of the data will be used for training')
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -297,7 +300,7 @@ def main(args_list):
     print(conf)
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
-        checkpoint, args.print_interval, quick=args.quick)
+        checkpoint, args.print_interval, args.subset)
     trainer.fit(args.epochs)
 
 if __name__ == '__main__':

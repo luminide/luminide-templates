@@ -1,6 +1,5 @@
 import os
 import yaml
-from ruamel.yaml import YAML
 
 class Config():
     def __init__(self, init=None):
@@ -33,5 +32,4 @@ class Config():
         conf_file = '../code/config.yaml'
         assert os.path.exists(conf_file)
         with open(conf_file) as file:
-            yaml_obj = YAML(typ='safe')
-            return yaml_obj.load(file)
+            return yaml.safe_load(file)
