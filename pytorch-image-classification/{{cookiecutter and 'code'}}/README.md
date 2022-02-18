@@ -31,15 +31,25 @@ If an item has multiple labels, they should be separated by a space character as
 
 ### Using this repo with Luminide
 - Attach a Compute Server and download a dataset. An example dataset is available at gs://luminide-example-plant-pathology.
-- For exploratory analysis, modify and run [eda.ipynb](eda.ipynb).
+- For exploratory analysis, run [eda.ipynb](eda.ipynb).
 - To train, use the `Run Experiment` menu.
 - To monitor training progress, use the `Experiment Visualization` menu.
 - To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab.
 - After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
 - Use the `Experiment Tracking` menu to track experiments.
+
 {% if cookiecutter.Kaggle == "True" -%}
-- To use this repo for a Kaggle code competition, use [kaggle.sh](kaggle.sh) and [kaggle.ipynb](kaggle.ipynb) to upload and submit the code to Kaggle.
+- To use this repo for a Kaggle code competition:
+    - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
+    - Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle.
+    - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook and run it.
 
 {%- endif %}
+
+{%- if cookiecutter.data_subset_percentage != '100' %}
+
+Note: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
+{%- endif %}
+
 
 For more detailed documentation, see the [Luminide Tutorial](https://docs.luminide.com/docs/tutorial)

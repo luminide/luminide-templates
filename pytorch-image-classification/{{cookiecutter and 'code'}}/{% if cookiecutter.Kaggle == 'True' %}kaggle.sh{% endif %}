@@ -12,7 +12,7 @@ echo $(tput -T xterm setaf 4)Press enter to upload the code to a private dataset
 read
 
 # check for Kaggle API credentials
-[[ ! -f ~/.kaggle/kaggle.json ]]  && { echo "error: ~/.kaggle/kaggle.json not found on Compute Server"; exit 1; }
+[[ ! -f ~/.kaggle/kaggle.json ]]  && { echo 'error: Kaggle API token needs to be configured using the "Import Data" tab'; exit 1; }
 
 # create metadata file
 [[ ! -f ../$dataset_name/dataset-metadata.json ]] &&
