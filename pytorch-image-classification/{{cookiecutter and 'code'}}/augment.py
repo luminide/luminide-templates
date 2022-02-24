@@ -12,7 +12,16 @@ def make_train_augmenter(conf):
         ])
 
     crop_size = round(conf.image_size*conf.crop_size)
-    aug_list = [
+    aug_list = []
+    if conf.max_cutout > 0:
+        aug_list.extend([
+            A.CoarseDropout(
+                max_holes=conf.max_cutout, min_holes=1,
+                max_height=crop_size//10, max_width=crop_size//10,
+                min_height=4, min_width=4, p=0.2*p),
+        ])
+
+    aug_list.extend([
         A.ShiftScaleRotate(
             shift_limit=0.0625, scale_limit=0.2, rotate_limit=25,
             interpolation=cv2.INTER_AREA, p=p),
@@ -24,7 +33,7 @@ def make_train_augmenter(conf):
             A.Blur(blur_limit=3, p=0.1*p),
         ], p=0.2*p),
         A.Perspective(p=0.2*p),
-    ]
+    ])
 
     if conf.strong_aug:
         aug_list.extend([
@@ -39,6 +48,7 @@ def make_train_augmenter(conf):
                 A.Sharpen(p=0.2*p),
                 A.Emboss(p=0.2*p),
                 A.RandomBrightnessContrast(p=0.2*p),
+                A.ColorJitter(p=0.2*p),
             ], p=0.3*p),
         ])
 
