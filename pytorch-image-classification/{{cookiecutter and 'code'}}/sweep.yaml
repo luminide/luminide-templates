@@ -1,19 +1,43 @@
 parameters:
   arch:
-    values: ['resnet18', 'resnet50', 'efficientnet_b3', 'seresnext50_32x4d']
-  optim:
-    values: ['sgd', 'adam']
+    values: ['resnet18', 'efficientnet_b3', 'seresnext50_32x4d']
+  dropout_rate:
+    distribution: q_uniform
+    min: 0.0
+    max: 0.75
+    q: 0.25
   lr:
     distribution: log_uniform
     min: 0.0001
-    max: 0.01
+    max: 0.1
+  weight_decay:
+    distribution: q_uniform
+    min: 0.0
+    max: 0.1
+    q: 0.01
+  batch_size:
+    distribution: q_uniform
+    min: 8
+    max: 32
+    q: 8
   image_size:
-    values: [64, 128, 256, 320, 384, 400]
+    distribution: q_uniform
+    min: 80
+    max: 400
+    q: 64
   crop_size:
-    values: [0.8, 0.9, 0.96]
+    distribution: q_uniform
+    min: 0.8
+    max: 0.96
+    q: 0.04
   aug_prob:
     distribution: uniform
     min: 0.0
     max: 0.95
+  max_cutout:
+    distribution: q_uniform
+    min: 0
+    max: 40
+    q: 10
   strong_aug:
     values: [True, False]

@@ -91,7 +91,7 @@ class Trainer:
         test_aug = make_test_augmenter(conf)
 
         # split into train and validation sets
-        split = df.shape[0]*80//100
+        split = df.shape[0]*90//100
         train_df = df.iloc[:split].reset_index(drop=True)
         val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = VisionDataset(
@@ -115,9 +115,11 @@ class Trainer:
         if conf.optim == 'sgd':
             return torch.optim.SGD(
                 model.parameters(), lr=conf.lr, momentum=0.9,
-                weight_decay=0.01, nesterov=True)
+                weight_decay=conf.weight_decay)
         if conf.optim == 'adam':
-            return torch.optim.AdamW(model.parameters(), lr=conf.lr)
+            return torch.optim.AdamW(
+                model.parameters(), lr=conf.lr,
+                weight_decay=conf.weight_decay)
         return None
 
     def fit(self, epochs):
@@ -141,7 +143,7 @@ class Trainer:
             writer.add_scalar('Validation F1 score', val_score, epoch)
             writer.flush()
             print(f'Epoch {epoch + 1}: training loss {train_loss:.5f}')
-            print(f'Validation F1 score {val_score:.2f} loss {val_loss:.5f}\n')
+            print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
             history.append([epoch, -1, np.nan, np.nan, val_loss])
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
@@ -260,7 +262,10 @@ class Trainer:
                 start_idx = end_idx
                 losses.append(loss_func(outputs, labels).item())
 
-        score = f1_score(all_labels, preds, average='micro')
+        if np.isfinite(preds).all():
+            score = f1_score(all_labels, preds, average='micro')
+        else:
+            score = np.nan
         return np.mean(losses), score
 
     def make_report(self, loader):
@@ -282,7 +287,7 @@ def main(args_list):
         args = parser.parse_args(args=args_list)
 
     if args.subset != 100:
-        print(f'WARNING: {args.subset}% of the data will be used for training')
+        print(f'\nWARNING: {args.subset}% of the data will be used for training\n')
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
