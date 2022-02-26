@@ -35,7 +35,7 @@ def create_test_loader(conf, input_dir, class_names):
     return loader, test_df
 
 def create_model(model_dir, num_classes):
-    checkpoint = torch.load(f'{model_dir}/model.pth')
+    checkpoint = torch.load(f'{model_dir}/model.pth', map_location=device)
     conf = Config(checkpoint['conf'])
     conf.pretrained = False
     model = ModelWrapper(conf, num_classes)
@@ -52,8 +52,16 @@ def test(loader, model, num_classes):
         for images, _ in loader:
             images = images.to(device)
             outputs = model(images)
-            end_idx = start_idx + outputs.shape[0]
-            preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+            # multi-label classification:
+            # set the prediction to 1 iff sigmoid(output) >= 0.5
+            pred_batch = sigmoid(outputs).round().cpu().numpy()
+            num_rows = pred_batch.shape[0]
+            # for each example, pick the label that was predicted as most likely
+            max_inds = outputs.argmax(axis=1).cpu().numpy()
+            # this is to make sure that at least one class is predicted
+            pred_batch[range(num_rows), max_inds] = 1
+            end_idx = start_idx + num_rows
+            preds[start_idx:end_idx] = pred_batch
             start_idx = end_idx
     return preds
 

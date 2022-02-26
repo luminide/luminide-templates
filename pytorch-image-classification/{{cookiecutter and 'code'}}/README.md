@@ -42,7 +42,11 @@ If an item has multiple labels, they should be separated by a space character as
 - To use this repo for a Kaggle code competition:
     - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
     - Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle.
-    - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook and run it.
+    - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook.
+    - Add the notebook output of `https://www.kaggle.com/luminide/wheels` as Data.
+    - Add your dataset at `https://www.kaggle.com/<kaggle_username>/kagglecode` as Data.
+    - Add the relevant competition dataset as Data.
+    - Run the notebook after turning off the `Internet` setting.
 
 {%- endif %}
 
