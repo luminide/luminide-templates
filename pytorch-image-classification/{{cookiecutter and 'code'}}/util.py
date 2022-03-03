@@ -4,7 +4,24 @@ from albumentations.pytorch import ToTensorV2
 
 def get_class_names(df):
     labels = df['{{ cookiecutter.label_column }}']
-    return np.unique(' '.join(labels.unique()).split()).tolist()
+    return np.unique(' '.join(labels.unique()).split())
+
+def search_layer(module, layer_type, reverse=True):
+    if isinstance(module, layer_type):
+        return module
+
+    if not hasattr(module, 'children'):
+        return None
+
+    children = list(module.children())
+    if reverse:
+        children = reversed(children)
+    # search for the first occurence recursively
+    for child in children:
+        res = search_layer(child, layer_type)
+        if res:
+            return res
+    return None
 
 {% if cookiecutter.augmentation == "True" -%}
 def make_test_augmenter(conf):
