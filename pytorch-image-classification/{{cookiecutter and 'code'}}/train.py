@@ -20,7 +20,6 @@ from augment import make_train_augmenter
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
-from report import plot_images
 from util import get_class_names, make_test_augmenter
 
 
@@ -48,12 +47,11 @@ parser.add_argument(
     help='input directory')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f'Running on {device}')
 
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval, subset=100):
+            checkpoint, print_interval=100, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
@@ -100,8 +98,6 @@ class Trainer:
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             class_names, test_aug, subset)
-        print(f'{len(train_dataset)} examples in training set')
-        print(f'{len(val_dataset)} examples in validation set')
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
@@ -127,6 +123,9 @@ class Trainer:
         history = []
         patience = self.max_patience
 
+        print(f'Running on {device}')
+        print(f'{len(self.train_loader.dataset)} examples in training set')
+        print(f'{len(self.val_loader.dataset)} examples in validation set')
         trial = os.environ.get('TRIAL')
         suffix = f"-trial{trial}" if trial is not None else ""
         log_dir = f"runs/{datetime.now().strftime('%b%d_%H-%M-%S')}{suffix}"
@@ -136,7 +135,7 @@ class Trainer:
         for epoch in range(epochs):
             # train for one epoch
             train_loss = self.train_epoch(epoch, history)
-            val_loss, val_score = self.val_epoch()
+            val_loss, val_score = self.validate()
             self.scheduler.step()
             writer.add_scalar('Training loss', train_loss, epoch)
             writer.add_scalar('Validation loss', val_loss, epoch)
@@ -166,7 +165,6 @@ class Trainer:
             history, columns=['epoch', 'iter', 'train_loss', 'val_loss', 'epoch_val_loss'])
         df.to_csv('history.csv')
         writer.close()
-        self.make_report(self.train_loader)
 
     def train_epoch(self, epoch, history):
         loss_func = nn.BCEWithLogitsLoss()
@@ -237,7 +235,7 @@ class Trainer:
         mean_train_loss = np.array(train_loss_list).mean()
         return mean_train_loss
 
-    def val_epoch(self):
+    def validate(self):
         loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
