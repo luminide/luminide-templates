@@ -34,7 +34,8 @@ If an item has multiple labels, they should be separated by a space character as
 - For exploratory analysis, run [eda.ipynb](eda.ipynb).
 - To train, use the `Run Experiment` menu.
 - To monitor training progress, use the `Experiment Visualization` menu.
-- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab.
+- To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
+- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab. Tuned values will be copied back to a file called `config-tuned.yaml` along with visualizations in `sweep-results.html`.
 - After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
 - Use the `Experiment Tracking` menu to track experiments.
 

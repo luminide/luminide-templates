@@ -1,2 +1,2 @@
 # project-templates
-Project templates for use with cookiecutter
+Project templates for use with Luminide
