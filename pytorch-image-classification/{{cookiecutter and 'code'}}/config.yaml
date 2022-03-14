@@ -18,6 +18,8 @@ batch_size: 32
 gamma: 0.96
 
 {%- if cookiecutter.augmentation == "True" %}
+
+# data augmentation
 aug_prob: 0.1
 strong_aug: false
 max_cutout: 0
