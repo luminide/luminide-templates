@@ -20,7 +20,7 @@ from augment import make_train_augmenter
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
-from util import get_class_names, make_test_augmenter
+from util import LossHistory, get_class_names, make_test_augmenter
 
 
 parser = argparse.ArgumentParser()
@@ -74,6 +74,7 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
+        self.history = None
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
@@ -120,8 +121,9 @@ class Trainer:
 
     def fit(self, epochs):
         best_loss = None
-        history = []
         patience = self.max_patience
+        self.sample_count = 0
+        self.history = LossHistory()
 
         print(f'Running on {device}')
         print(f'{len(self.train_loader.dataset)} examples in training set')
@@ -134,16 +136,16 @@ class Trainer:
         print('Training in progress...')
         for epoch in range(epochs):
             # train for one epoch
-            train_loss = self.train_epoch(epoch, history)
+            train_loss = self.train_epoch(epoch)
             val_loss, val_score = self.validate()
             self.scheduler.step()
             writer.add_scalar('Training loss', train_loss, epoch)
             writer.add_scalar('Validation loss', val_loss, epoch)
             writer.add_scalar('Validation F1 score', val_score, epoch)
             writer.flush()
-            print(f'Epoch {epoch + 1}: training loss {train_loss:.5f}')
+            print(f'Epoch {epoch}: training loss {train_loss:.5f}')
             print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
-            history.append([epoch, -1, np.nan, np.nan, val_loss])
+            self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
                 state = {
@@ -161,12 +163,10 @@ class Trainer:
                         f'{self.max_patience} epochs')
                     break
 
-        df = pd.DataFrame(
-            history, columns=['epoch', 'iter', 'train_loss', 'val_loss', 'epoch_val_loss'])
-        df.to_csv('history.csv')
+        self.history.save()
         writer.close()
 
-    def train_epoch(self, epoch, history):
+    def train_epoch(self, epoch):
         loss_func = nn.BCEWithLogitsLoss()
         model = self.model
         optimizer = self.optimizer
@@ -175,7 +175,6 @@ class Trainer:
         val_interval = len(self.train_loader)//len(self.val_loader)
         assert val_interval > 0
         train_loss_list = []
-        val_loss_list = []
         model.train()
         for step, (images, labels) in enumerate(self.train_loader):
             if (step + 1) % val_interval == 0:
@@ -193,8 +192,7 @@ class Trainer:
                         val_outputs = model(val_images)
 {%- endif %}
                         val_loss = loss_func(val_outputs, val_labels)
-                        history.append([epoch, step, np.nan, val_loss.item(), np.nan])
-                        val_loss_list.append(val_loss.item())
+                        self.history.add_val_loss(epoch, self.sample_count, val_loss.item())
                 except StopIteration:
                     pass
                 # switch back to training mode
@@ -214,7 +212,8 @@ class Trainer:
 {%- endif %}
 
             train_loss_list.append(loss.item())
-            history.append([epoch, step, loss.item(), np.nan, np.nan])
+            self.sample_count += images.shape[0]
+            self.history.add_train_loss(epoch, self.sample_count, loss.item())
             if (step + 1) % self.print_interval == 0:
                 print(f'Batch {step + 1}: training loss {loss.item():.5f}')
             # compute gradient and do SGD step
@@ -266,24 +265,14 @@ class Trainer:
             score = np.nan
         return np.mean(losses), score
 
-    def make_report(self, loader):
-        images, labels = iter(loader).next()
-        with torch.no_grad():
-            outputs = self.model(images.to(device)).cpu()
-        plot_images(images, labels, outputs)
-
 
 def worker_init_fn(worker_id):
     random.seed(random.randint(0, 2**32) + worker_id)
     np.random.seed(random.randint(0, 2**32) + worker_id)
 
 
-def main(args_list):
-    if args_list is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(args=args_list)
-
+def main():
+    args = parser.parse_args()
     if args.subset != 100:
         print(f'\nWARNING: {args.subset}% of the data will be used for training\n')
     if args.seed is not None:
@@ -306,6 +295,7 @@ def main(args_list):
         checkpoint, args.print_interval, args.subset)
     trainer.fit(args.epochs)
 
+
 if __name__ == '__main__':
-    main(None)
+    main()
     print('Done')
