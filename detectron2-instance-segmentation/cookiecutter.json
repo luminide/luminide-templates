@@ -1,0 +1,11 @@
+{
+    "project_description": "Instance segmentation",
+    "train_metadata": "train.csv",
+    "train_image_dir": "train",
+    "file_extension": "png",
+    "image_column": "id",
+    "annotation_column": "annotation",
+    "label_column": "cell_type",
+    "augmentation": ["True", "False"],
+    "Kaggle": ["False", "True"]
+}

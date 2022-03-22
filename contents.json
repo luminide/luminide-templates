@@ -5,23 +5,31 @@
             "tags": [
                 "PyTorch",
                 "timm",
-                "albumentations"
+                "albumentations",
+                "detectron2"
             ]
         },
         {
             "name": "Problem type",
             "tags": [
                 "Computer Vision",
-                "Classification"
+                "Classification",
+                "Segmentation"
             ]
         }
     ],
     "templates": [
         {
-            "name": "PyTorch Image Classification",
-            "description": "Basic image classification",
+            "name": "Image Classification",
+            "description": "Image classification with PyTorch",
             "directory": "pytorch-image-classification",
             "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
+        },
+        {
+            "name": "Instance Segmentation",
+            "description": "Instance segmentation using Detectron2",
+            "directory": "detectron2-instance-segmentation",
+            "tags": [ "detectron2", "Computer Vision", "Segmentation" ]
         }
     ]
 }
