@@ -93,6 +93,7 @@ class ValidationLossHook(HookBase):
             # finished an epoch
             curr_loss = np.mean(self.epoch_losses)
             self.trainer.loss_history.add_epoch_val_loss(epoch, self.sample_count, curr_loss)
+            self.trainer.loss_history.save()
             print(f'epoch {epoch} iter {curr_iter} curr loss {curr_loss:.4f}')
             is_best = self.best_loss is None or curr_loss < self.best_loss
             if is_best:
@@ -185,19 +186,19 @@ def main():
     with open('cfg.yaml', 'w') as fd:
         fd.write(cfg.dump())
 
-    model = Trainer(cfg)
-    model.loss_history = LossHistory()
-    model.register_hooks([ValidationLossHook(cfg, conf, batch_count)])
+    trainer = Trainer(cfg)
+    trainer.loss_history = LossHistory()
+    trainer.register_hooks([ValidationLossHook(cfg, conf, batch_count)])
     # The PeriodicWriter needs to be the last hook, otherwise it wont
     # have access to val_loss metrics
     # ref: https://github.com/facebookresearch/detectron2/issues/810
-    periodic_writer_hook = [hook for hook in model._hooks if isinstance(hook, PeriodicWriter)]
-    all_other_hooks = [hook for hook in model._hooks if not isinstance(hook, PeriodicWriter)]
-    model._hooks = all_other_hooks + periodic_writer_hook
+    periodic_writer_hook = [hook for hook in trainer._hooks if isinstance(hook, PeriodicWriter)]
+    all_other_hooks = [hook for hook in trainer._hooks if not isinstance(hook, PeriodicWriter)]
+    trainer._hooks = all_other_hooks + periodic_writer_hook
 
-    model.resume_or_load(resume=args.resume)
-    model.train()
-    model.loss_history.save()
+    trainer.resume_or_load(resume=args.resume)
+    trainer.train()
+    trainer.loss_history.save()
 
 
 if __name__ == '__main__':

@@ -30,8 +30,8 @@ The CSV file is expected to have class labels under a column named `{{ cookiecut
 The annotations are assumed to be run length encoded masks.
 
 ### Using this repo with Luminide
-- Attach a Compute Server and download a dataset. An example dataset would be `https://www.kaggle.com/c/sartorius-cell-instance-segmentation/data`.
-- Convert the dataset to COCO format by launching `prep.sh` using the `Run Experiment` tab.
+- Attach a Compute Server and download a dataset. An example dataset would be `https://www.kaggle.com/c/sartorius-cell-instance-segmentation/data` (in Luminide, select Import Data to Compute Server > Kaggle > Competition and enter "sartorius-cell-instance-segmentation" after first accepting the rules).
+- Convert the dataset to COCO format by launching `prep.sh` from the `Run Experiment` tab.
 - For exploratory analysis, run [eda.ipynb](eda.ipynb).
 - To train, launch `full.sh` from the `Run Experiment` tab.
 - To monitor training progress, use the `Experiment Visualization` menu.

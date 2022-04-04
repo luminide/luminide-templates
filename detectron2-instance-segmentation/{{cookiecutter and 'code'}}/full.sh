@@ -8,4 +8,4 @@
 #  - This script will be run from your output directory
 #  - Imported Data is accessible via the relative path ../input/
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 50 --seed 0
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60
