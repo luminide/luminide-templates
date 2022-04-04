@@ -136,6 +136,7 @@ class Trainer:
         print('Training in progress...')
         for epoch in range(epochs):
             # train for one epoch
+            print(f'Epoch {epoch}:')
             train_loss = self.train_epoch(epoch)
             val_loss, val_score = self.validate()
             self.scheduler.step()
@@ -143,7 +144,7 @@ class Trainer:
             writer.add_scalar('Validation loss', val_loss, epoch)
             writer.add_scalar('Validation F1 score', val_score, epoch)
             writer.flush()
-            print(f'Epoch {epoch}: training loss {train_loss:.5f}')
+            print(f'training loss {train_loss:.5f}')
             print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
             self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
             if best_loss is None or val_loss < best_loss:
@@ -163,7 +164,7 @@ class Trainer:
                         f'{self.max_patience} epochs')
                     break
 
-        self.history.save()
+            self.history.save()
         writer.close()
 
     def train_epoch(self, epoch):
