@@ -10,8 +10,8 @@
 
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 40 --seed 0
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60
 {%- else %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 40 --seed 0 --subset {{ cookiecutter.data_subset_percentage }}
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60 --subset {{ cookiecutter.data_subset_percentage }}
 {%- endif %}

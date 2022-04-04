@@ -17,19 +17,20 @@ parameters:
     q: 0.01
   batch_size:
     distribution: q_uniform
-    min: 8
-    max: 32
-    q: 8
+    min: 16
+    max: 128
+    q: 16
   image_size:
     distribution: q_uniform
-    min: 80
-    max: 400
-    q: 64
+    min: 64
+    max: 128
+    q: 16
   crop_size:
     distribution: q_uniform
     min: 0.8
     max: 0.96
     q: 0.04
+{%- if cookiecutter.augmentation == "True" %}
   aug_prob:
     distribution: uniform
     min: 0.0
@@ -41,3 +42,4 @@ parameters:
     q: 10
   strong_aug:
     values: [True, False]
+{%- endif %}

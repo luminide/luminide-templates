@@ -28,7 +28,7 @@ class LossHistory:
 
 def get_class_names(df):
     labels = df['{{ cookiecutter.label_column }}']
-    return np.unique(' '.join(labels.unique()).split())
+    return list(labels.unique())
 
 def search_layer(module, layer_type, reverse=True):
     if isinstance(module, layer_type):

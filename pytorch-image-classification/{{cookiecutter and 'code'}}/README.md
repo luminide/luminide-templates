@@ -22,7 +22,7 @@ input
 The CSV file is expected to have labels under a column named `{{ cookiecutter.label_column }}` as in the example below:
 
 ```
-image,labels
+{{ cookiecutter.image_column }},{{ cookiecutter.label_column }}
 800113bb65efe69e.jpg,healthy
 8002cb321f8bfcdf.jpg,scab frog_eye_leaf_spot complex
 80070f7fb5e2ccaa.jpg,scab
@@ -44,7 +44,7 @@ If an item has multiple labels, they should be separated by a space character as
     - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
     - Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle.
     - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook.
-    - Add the notebook output of `https://www.kaggle.com/luminide/wheels` as Data.
+    - Add the notebook output of `https://www.kaggle.com/luminide/wheels1` as Data.
     - Add your dataset at `https://www.kaggle.com/<kaggle_username>/kagglecode` as Data.
     - Add the relevant competition dataset as Data.
     - Run the notebook after turning off the `Internet` setting.
