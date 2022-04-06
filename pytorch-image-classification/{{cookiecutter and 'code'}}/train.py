@@ -13,7 +13,8 @@ import torch
 from torch import nn
 import torch.utils.data as data
 {%- if cookiecutter.AMP == "True" %}
-from torch.cuda.amp import GradScaler, autocast
+from torch import autocast
+from torch.cuda.amp import GradScaler 
 {%- endif %}
 
 from augment import make_train_augmenter
@@ -46,7 +47,8 @@ parser.add_argument(
     '--input', default='../input', metavar='DIR',
     help='input directory')
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = torch.device(device_type)
 
 class Trainer:
     def __init__(
@@ -187,7 +189,7 @@ class Trainer:
                         val_images = val_images.to(device)
                         val_labels = val_labels.to(device)
 {%- if cookiecutter.AMP == "True" %}
-                        with autocast(enabled=self.use_amp):
+                        with autocast(device_type, enabled=self.use_amp):
                             val_outputs = model(val_images)
 {%- elif cookiecutter.AMP == "False" %}
                         val_outputs = model(val_images)
@@ -204,7 +206,7 @@ class Trainer:
             # compute output
 {%- if cookiecutter.AMP == "True" %}
             # use AMP
-            with autocast(enabled=self.use_amp):
+            with autocast(device_type, enabled=self.use_amp):
                 outputs = model(images)
                 loss = loss_func(outputs, labels)
 {%- elif cookiecutter.AMP == "False" %}
@@ -249,7 +251,7 @@ class Trainer:
                 images = images.to(device)
                 labels = labels.to(device)
 {%- if cookiecutter.AMP == "True" %}
-                with autocast(enabled=self.use_amp):
+                with autocast(device_type, enabled=self.use_amp):
                     outputs = self.model(images)
 {%- elif cookiecutter.AMP == "False" %}
                 outputs = self.model(images)
