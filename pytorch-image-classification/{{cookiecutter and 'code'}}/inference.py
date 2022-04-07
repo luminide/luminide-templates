@@ -31,7 +31,7 @@ def create_test_loader(conf, input_dir, class_names):
     print(f'{len(test_dataset)} examples in test set')
     loader = data.DataLoader(
         test_dataset, batch_size=conf.batch_size, shuffle=False,
-        num_workers=mp.cpu_count(), pin_memory=True)
+        num_workers=mp.cpu_count(), pin_memory=False)
     return loader, test_df
 
 def create_model(model_dir, num_classes):

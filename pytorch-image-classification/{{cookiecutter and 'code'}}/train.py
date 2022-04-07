@@ -104,11 +104,11 @@ class Trainer:
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
-            num_workers=num_workers, pin_memory=True,
+            num_workers=num_workers, pin_memory=False,
             worker_init_fn=worker_init_fn, drop_last=drop_last)
         self.val_loader = data.DataLoader(
             val_dataset, batch_size=conf.batch_size, shuffle=False,
-            num_workers=num_workers, pin_memory=True)
+            num_workers=num_workers, pin_memory=False)
 
     def create_optimizer(self, conf, model):
         if conf.optim == 'sgd':
