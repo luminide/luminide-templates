@@ -53,4 +53,4 @@ The annotations are assumed to be run length encoded masks.
 {%- endif %}
 
 
-For more detailed documentation, see the [Luminide Tutorial](https://docs.luminide.com/docs/tutorial)
+For more details on usage, see [Luminide documentation](https://luminide.readthedocs.io)
