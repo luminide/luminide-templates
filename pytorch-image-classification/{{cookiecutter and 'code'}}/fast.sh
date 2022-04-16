@@ -1,4 +1,7 @@
 #!/bin/bash 
+#
+# train for a few epochs while performing "fast sweeps"
+#
 
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
