@@ -1,0 +1,11 @@
+{
+    "project_description": "Sorghum -100 Cultivar Identification - FGVC 9",
+    "train_metadata": "train_cultivar_mapping.csv",
+    "train_image_dir": "train_images",
+    "image_column": "image",
+    "label_column": "cultivar",
+    "image_size": 64,
+    "data_subset_percentage": 50,
+    "augmentation": ["True", "False"],
+    "AMP": ["True", "False"],
+}
