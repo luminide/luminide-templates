@@ -20,7 +20,7 @@ class VisionDataset(data.Dataset):
         files = df['{{ cookiecutter.image_column }}']
         assert isinstance(files[0], str), (
             f'column {df.columns[0]} must be of type str')
-        self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
+        self.files = [os.path.join(input_dir, imgs_dir, f.replace('.png', '.jpg')) for f in files]
 
         labels = df['{{ cookiecutter.label_column }}']
         num_samples = len(files)

@@ -14,7 +14,8 @@
             "tags": [
                 "Computer Vision",
                 "Classification",
-                "Segmentation"
+                "Segmentation",
+                "Kaggle"
             ]
         }
     ],
@@ -30,6 +31,12 @@
             "description": "Instance segmentation using Detectron2",
             "directory": "detectron2-instance-segmentation",
             "tags": [ "detectron2", "Computer Vision", "Segmentation" ]
+        },
+        {
+            "name": "Sorghum -100 Cultivar Identification - FGVC 9",
+            "description": "Image classification with PyTorch",
+            "directory": "pytorch-kaggle-sorghum",
+            "tags": [ "PyTorch", "timm", "Computer Vision", "Classification", "Kaggle" ]
         }
     ]
 }

@@ -5,7 +5,7 @@ import multiprocessing as mp
 from datetime import datetime
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score
+from sklearn.metrics import accuracy_score
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -83,6 +83,8 @@ class Trainer:
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
         df = pd.read_csv(meta_file, dtype=str)
+        # drop invalid rows
+        df.drop(np.where(df['{{ cookiecutter.label_column }}'].isnull())[0], inplace=True)
         class_names = get_class_names(df)
         self.num_classes = len(class_names)
 
@@ -144,10 +146,10 @@ class Trainer:
             self.scheduler.step()
             writer.add_scalar('Training loss', train_loss, epoch)
             writer.add_scalar('Validation loss', val_loss, epoch)
-            writer.add_scalar('Validation F1 score', val_score, epoch)
+            writer.add_scalar('Validation accuracy', val_score, epoch)
             writer.flush()
             print(f'training loss {train_loss:.5f}')
-            print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
+            print(f'Validation accuracy {val_score:.2f}% loss {val_loss:.4f}\n')
             self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
             if best_loss is None or val_loss < best_loss:
                 best_loss = val_loss
@@ -241,8 +243,7 @@ class Trainer:
         loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
-        all_labels = np.zeros(
-            (len(self.val_loader.dataset), self.num_classes), dtype=np.float32)
+        all_labels = np.zeros(len(self.val_loader.dataset), dtype=np.float32)
         preds = np.zeros_like(all_labels)
         start_idx = 0
         self.model.eval()
@@ -257,13 +258,13 @@ class Trainer:
                 outputs = self.model(images)
 {%- endif %}
                 end_idx = start_idx + outputs.shape[0]
-                all_labels[start_idx:end_idx] = labels.cpu().numpy()
-                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+                all_labels[start_idx:end_idx] = labels.argmax(axis=1).cpu().numpy()
+                preds[start_idx:end_idx] = outputs.argmax(axis=1).cpu().numpy()
                 start_idx = end_idx
                 losses.append(loss_func(outputs, labels).item())
 
         if np.isfinite(preds).all():
-            score = f1_score(all_labels, preds, average='micro')
+            score = 100*accuracy_score(all_labels, preds)
         else:
             score = np.nan
         return np.mean(losses), score
