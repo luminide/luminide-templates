@@ -35,6 +35,10 @@ parameters:
     distribution: uniform
     min: 0.0
     max: 0.95
+  segment_green:
+    distribution: uniform
+    min: 0.0
+    max: 0.8
   max_cutout:
     distribution: q_uniform
     min: 0
