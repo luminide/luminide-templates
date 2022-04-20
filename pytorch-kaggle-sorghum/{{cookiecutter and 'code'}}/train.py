@@ -78,25 +78,40 @@ class Trainer:
             self.optimizer, gamma=conf.gamma)
         self.history = None
 
+    def split(self, df, class_names, image_col, label_col):
+        train_list = []
+        val_list = []
+        for name in class_names:
+            # group according to class name and then sort according to file name
+            # this is to make the validation set dissimilar to the training set
+            sel = df[df[label_col] == name].sort_values(by=[image_col])
+            split = sel.shape[0]*90//100
+            train_list.append(sel.iloc[:split])
+            val_list.append(sel.iloc[split:])
+
+        train_df = pd.concat(train_list, ignore_index=True)
+        val_df = pd.concat(val_list, ignore_index=True)
+        return train_df, val_df
+
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
         df = pd.read_csv(meta_file, dtype=str)
-        # drop invalid rows
-        df.drop(np.where(df['{{ cookiecutter.label_column }}'].isnull())[0], inplace=True)
+        df.dropna(inplace=True)
         class_names = get_class_names(df)
         self.num_classes = len(class_names)
 
+        # split into train and validation sets
+        train_df, val_df = self.split(df, class_names, '{{ cookiecutter.image_column }}', '{{ cookiecutter.label_column }}')
+
         # shuffle
-        df = df.sample(frac=1, random_state=0).reset_index(drop=True)
+        train_df = train_df.sample(frac=1, random_state=0).reset_index(drop=True)
+        val_df = val_df.sample(frac=1, random_state=0).reset_index(drop=True)
+
         train_aug = make_train_augmenter(conf)
         test_aug = make_test_augmenter(conf)
 
-        # split into train and validation sets
-        split = df.shape[0]*90//100
-        train_df = df.iloc[:split].reset_index(drop=True)
-        val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             class_names, train_aug, subset)
