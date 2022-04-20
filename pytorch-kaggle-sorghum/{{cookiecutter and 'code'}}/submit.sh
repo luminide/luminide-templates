@@ -11,4 +11,5 @@ read
 
 set -x
 kaggle competitions submit -c sorghum-id-fgvc-9 -f submission.csv -m "$(date)"
+set +x
 echo

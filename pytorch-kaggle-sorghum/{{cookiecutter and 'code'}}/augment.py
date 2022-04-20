@@ -3,6 +3,18 @@ from albumentations.pytorch import ToTensorV2
 import cv2
 
 {% if cookiecutter.augmentation == "True" -%}
+
+class SegmentGreen(A.ImageOnlyTransform):
+
+    def __init__(self, always_apply=False, p=1.0):
+        super(SegmentGreen, self).__init__(always_apply, p)
+
+    def apply(self, img, **params):
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, (32, 0, 40) , (179, 255, 164))
+        img = cv2.bitwise_and(img, img, mask=mask)
+        return img
+
 def make_train_augmenter(conf):
     p = conf.aug_prob
     if p <= 0:
@@ -14,12 +26,14 @@ def make_train_augmenter(conf):
     crop_size = round(conf.image_size*conf.crop_size)
     aug_list = []
     if conf.max_cutout > 0:
-        aug_list.extend([
+        aug_list.append(
             A.CoarseDropout(
                 max_holes=conf.max_cutout, min_holes=1,
                 max_height=crop_size//10, max_width=crop_size//10,
-                min_height=4, min_width=4, p=0.2*p),
-        ])
+                min_height=4, min_width=4, p=0.2*p))
+
+    if conf.segment_green > 0:
+        aug_list.append(SegmentGreen(p=conf.segment_green))
 
     aug_list.extend([
         A.ShiftScaleRotate(

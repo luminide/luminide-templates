@@ -35,7 +35,7 @@ parser.add_argument(
     '-p', '--print-interval', default=100, type=int, metavar='N',
     help='print-interval in batches')
 parser.add_argument(
-    '--seed', default=0, type=int,
+    '--seed', default=None, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',

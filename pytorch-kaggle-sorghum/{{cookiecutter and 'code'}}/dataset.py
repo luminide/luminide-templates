@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+from skimage import exposure
 import torch.utils.data as data
 
 
@@ -45,6 +46,9 @@ class VisionDataset(data.Dataset):
         img = cv2.resize(img, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
 {%- endif %}
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if conf.equalize_hist:
+            img = exposure.equalize_adapthist(img, nbins=255).astype(np.float32)
+            img = (img*255).round().astype(np.uint8)
         if self.transform:
             img = self.transform(image=img)['image']
         label = self.labels[index]
