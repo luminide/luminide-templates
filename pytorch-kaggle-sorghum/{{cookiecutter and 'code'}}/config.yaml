@@ -1,5 +1,5 @@
 # this can be any network from the timm library
-arch: resnet18
+arch: resnet50
 pretrained: true
 dropout_rate: 0.5
 
@@ -12,7 +12,7 @@ crop_size: 0.6
 optim: adam
 lr: 0.001
 weight_decay: 0.01
-batch_size: 128
+batch_size: 96
 
 # scheduler settings
 gamma: 0.96

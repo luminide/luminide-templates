@@ -6,7 +6,7 @@
     "image_column": "image",
     "label_column": "cultivar",
     "image_size": 136,
-    "data_subset_percentage": 10,
+    "data_subset_percentage": 20,
     "augmentation": ["True", "False"],
     "AMP": ["True", "False"]
 }
