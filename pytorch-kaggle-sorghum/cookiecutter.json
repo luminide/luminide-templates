@@ -5,8 +5,8 @@
     "test_image_dir": "test",
     "image_column": "image",
     "label_column": "cultivar",
-    "image_size": 128,
-    "data_subset_percentage": 50,
+    "image_size": 136,
+    "data_subset_percentage": 10,
     "augmentation": ["True", "False"],
     "AMP": ["True", "False"]
 }

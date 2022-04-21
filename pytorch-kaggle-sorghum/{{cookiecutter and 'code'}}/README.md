@@ -14,9 +14,9 @@ The dataset should have images inside a directory named `{{ cookiecutter.train_i
 input
 ├── {{ cookiecutter.train_metadata }}
 └── {{ cookiecutter.train_image_dir }}
-    ├── 2017-06-16__12-24-20-930.jpg
-    ├── 2017-06-02__16-48-57-866.jpg
-    ├── 2017-06-12__13-18-07-707.jpg
+    ├── 2017-06-16__12-24-20-930_0.jpg
+    ├── 2017-06-16__12-24-20-930_1.jpg
+    ├── 2017-06-16__12-24-20-930_2.jpg
 ```
 
 The CSV file is expected to have labels under a column named `{{ cookiecutter.label_column }}` as in the example below:
@@ -32,7 +32,7 @@ If an item has multiple labels, they should be separated by a space character as
 ### Using this repo with Luminide
 - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
 - Attach a Compute Server with a GPU (e.g. gcp-t4).
-- On the `Import Data` data tab, choose Kaggle and then enter `anlthms/sorghum3` (User Dataset).
+- On the `Import Data` data tab, choose Kaggle and then enter `anlthms/sorghum1` (User Dataset).
 - For exploratory analysis, run [eda.ipynb](eda.ipynb).
 - To train, use the `Run Experiment` menu.
 - To monitor training progress, use the `Experiment Visualization` menu.

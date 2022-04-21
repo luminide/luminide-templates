@@ -1,4 +1,5 @@
 import os
+import argparse
 from glob import glob
 import multiprocessing as mp
 import numpy as np
@@ -12,6 +13,11 @@ from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '-n', '--num-patches', default=9, type=int, metavar='N',
+    help='number of patches per image')
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
 
@@ -22,7 +28,7 @@ def create_test_loader(conf, input_dir, class_names):
     test_df = pd.DataFrame()
     image_files = sorted(glob(f'{input_dir}/{image_dir}/*.*'))
     assert len(image_files) > 0, f'No files inside {input_dir}/{image_dir}'
-    image_files = [os.path.basename(filename.replace('.jpg', '.png')) for filename in image_files]
+    image_files = [os.path.basename(filename) for filename in image_files]
     test_df['{{ cookiecutter.image_column }}'] = image_files
     test_df['{{ cookiecutter.label_column }}'] = class_names[0]
     test_dataset = VisionDataset(
@@ -43,42 +49,53 @@ def create_model(model_dir, num_classes):
     model.load_state_dict(checkpoint['model'])
     return model, conf
 
-def test(loader, model, num_classes):
+def test(loader, model, num_classes, num_patches):
     sigmoid = nn.Sigmoid()
-    preds = np.zeros(len(loader.dataset), dtype=np.float32)
+    preds = np.zeros((len(loader.dataset), num_classes), dtype=np.float32)
     start_idx = 0
     model.eval()
     with torch.no_grad():
         for images, _ in loader:
             images = images.to(device)
             outputs = model(images)
-            pred_batch = outputs.argmax(axis=1).cpu().numpy()
+            pred_batch = outputs.cpu().numpy()
             num_rows = pred_batch.shape[0]
             end_idx = start_idx + num_rows
             preds[start_idx:end_idx] = pred_batch
             start_idx = end_idx
+
+    assert preds.shape[0] % num_patches == 0
+    preds = preds.reshape((preds.shape[0]//num_patches, num_patches, -1))
+    # average predictions from patches
+    preds = preds.mean(axis=1).argmax(axis=1)
     return preds
 
-def save_results(df, preds, class_names):
+def collapse(filenames, num_patches):
+    filenames = filenames.iloc[::num_patches]
+    # rename from xxx_x.jpg to xxx.png
+    return [f'{fn[:-6]}.png' for fn in filenames]
+
+def save_results(df, preds, class_names, num_patches):
     pred_names = [class_names[int(pred)] for pred in preds]
-    df['{{ cookiecutter.label_column }}'] = pred_names
-    df.rename(columns={'{{ cookiecutter.image_column }}': 'filename'}, inplace=True)
-    df.to_csv('submission.csv', index=False)
+    results = pd.DataFrame()
+    results['filename'] = collapse(df['{{ cookiecutter.image_column }}'], num_patches)
+    results['{{ cookiecutter.label_column }}'] = pred_names
+    results.to_csv('submission.csv', index=False)
     print('Saved submission.csv')
 
-def run(input_dir, model_dir):
+def run(args, input_dir, model_dir):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
     train_df = pd.read_csv(meta_file, dtype=str)
-    # drop invalid rows
-    train_df.drop(np.where(train_df['{{ cookiecutter.label_column }}'].isnull())[0], inplace=True)
+    train_df.dropna(inplace=True)
     class_names = np.array(get_class_names(train_df))
     num_classes = len(class_names)
 
     model, conf = create_model(model_dir, num_classes)
     loader, df = create_test_loader(conf, input_dir, class_names)
-    preds = test(loader, model, num_classes)
-    save_results(df, preds, class_names)
+    preds = test(loader, model, num_classes, args.num_patches)
+    save_results(df, preds, class_names, args.num_patches)
 
 if __name__ == '__main__':
-    run('../input', './')
+    args = parser.parse_args()
+    run(args, '../input', './')
 

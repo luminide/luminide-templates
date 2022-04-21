@@ -14,7 +14,7 @@ from torch import nn
 import torch.utils.data as data
 {%- if cookiecutter.AMP == "True" %}
 from torch import autocast
-from torch.cuda.amp import GradScaler 
+from torch.cuda.amp import GradScaler
 {%- endif %}
 
 from augment import make_train_augmenter
@@ -44,6 +44,9 @@ parser.add_argument(
     '-s', '--subset', default=100, type=int, metavar='N',
     help='use a percentage of the data for training and validation')
 parser.add_argument(
+    '-n', '--num-patches', default=9, type=int, metavar='N',
+    help='number of patches per image')
+parser.add_argument(
     '--input', default='../input', metavar='DIR',
     help='input directory')
 
@@ -53,10 +56,11 @@ device = torch.device(device_type)
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval=100, subset=100):
+            checkpoint, num_patches, print_interval=100, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
+        self.num_patches = num_patches
         self.max_patience = 10
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
@@ -78,19 +82,35 @@ class Trainer:
             self.optimizer, gamma=conf.gamma)
         self.history = None
 
-    def split(self, df, class_names, image_col, label_col):
+    def expand(self, df, image_col, label_col):
+        # expand each image into patches
+        ex_df = pd.DataFrame()
+        ex_df[image_col] = [
+            f'{fn[:-4]}_{i}.jpg' for fn in df[image_col] for i in range(self.num_patches)]
+        ex_df[label_col] = df[label_col].repeat(self.num_patches).values
+        return ex_df
+
+    def split(self, df, class_names, subset, image_col, label_col):
         train_list = []
         val_list = []
         for name in class_names:
             # group according to class name and then sort according to file name
             # this is to make the validation set dissimilar to the training set
             sel = df[df[label_col] == name].sort_values(by=[image_col])
+            if subset < 100:
+                # train and validate on subsets
+                num_rows = sel.shape[0]*subset//100
+                sel = sel.iloc[:num_rows]
+
             split = sel.shape[0]*90//100
             train_list.append(sel.iloc[:split])
             val_list.append(sel.iloc[split:])
 
-        train_df = pd.concat(train_list, ignore_index=True)
-        val_df = pd.concat(val_list, ignore_index=True)
+        train_df = self.expand(pd.concat(train_list, ignore_index=True), image_col, label_col)
+        val_df = self.expand(pd.concat(val_list, ignore_index=True), image_col, label_col)
+
+        # shuffle the patches in the training set
+        train_df = train_df.sample(frac=1, random_state=0).reset_index(drop=True)
         return train_df, val_df
 
     def create_dataloaders(self, num_workers, subset):
@@ -103,21 +123,19 @@ class Trainer:
         self.num_classes = len(class_names)
 
         # split into train and validation sets
-        train_df, val_df = self.split(df, class_names, '{{ cookiecutter.image_column }}', '{{ cookiecutter.label_column }}')
-
-        # shuffle
-        train_df = train_df.sample(frac=1, random_state=0).reset_index(drop=True)
-        val_df = val_df.sample(frac=1, random_state=0).reset_index(drop=True)
+        train_df, val_df = self.split(
+            df, class_names, subset,
+            '{{ cookiecutter.image_column }}', '{{ cookiecutter.label_column }}')
 
         train_aug = make_train_augmenter(conf)
         test_aug = make_test_augmenter(conf)
 
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, train_aug, subset)
+            class_names, train_aug)
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, test_aug, subset)
+            class_names, test_aug)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
@@ -259,7 +277,7 @@ class Trainer:
         sigmoid = nn.Sigmoid()
         losses = []
         all_labels = np.zeros(len(self.val_loader.dataset), dtype=np.float32)
-        preds = np.zeros_like(all_labels)
+        preds = np.zeros((len(self.val_loader.dataset), self.num_classes), dtype=np.float32)
         start_idx = 0
         self.model.eval()
         with torch.no_grad():
@@ -274,10 +292,16 @@ class Trainer:
 {%- endif %}
                 end_idx = start_idx + outputs.shape[0]
                 all_labels[start_idx:end_idx] = labels.argmax(axis=1).cpu().numpy()
-                preds[start_idx:end_idx] = outputs.argmax(axis=1).cpu().numpy()
+                preds[start_idx:end_idx] = outputs.cpu().numpy()
                 start_idx = end_idx
                 losses.append(loss_func(outputs, labels).item())
 
+        assert preds.shape[0] % self.num_patches == 0
+        preds = preds.reshape((preds.shape[0]//self.num_patches, self.num_patches, -1))
+        all_labels = all_labels.reshape((all_labels.shape[0]//self.num_patches, self.num_patches, -1))
+        all_labels = all_labels.mean(axis=1)
+        # average predictions from patches
+        preds = preds.mean(axis=1).argmax(axis=1)
         if np.isfinite(preds).all():
             score = 100*accuracy_score(all_labels, preds)
         else:
@@ -292,7 +316,7 @@ def worker_init_fn(worker_id):
 
 def main():
     args = parser.parse_args()
-    if args.subset != 100:
+    if args.subset < 100:
         print(f'\nWARNING: {args.subset}% of the data will be used for training\n')
     if args.seed is not None:
         random.seed(args.seed)
@@ -311,7 +335,7 @@ def main():
     print(conf)
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
-        checkpoint, args.print_interval, args.subset)
+        checkpoint, args.num_patches, args.print_interval, args.subset)
     trainer.fit(args.epochs)
 
 
