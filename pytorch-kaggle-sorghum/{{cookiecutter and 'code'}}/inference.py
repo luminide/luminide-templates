@@ -8,7 +8,7 @@ import torch
 from torch import nn
 import torch.utils.data as data
 
-from util import get_class_names, make_test_augmenter
+from util import get_class_names, make_test_augmenter, save_dist
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
@@ -82,6 +82,10 @@ def save_results(df, preds, class_names, num_patches):
     results['{{ cookiecutter.label_column }}'] = pred_names
     results.to_csv('submission.csv', index=False)
     print('Saved submission.csv')
+
+    dist_file = 'predicted-distribution.png'
+    save_dist(results['{{ cookiecutter.label_column }}'].value_counts(), dist_file)
+    print(f'\nSaved predicted class distribution to {dist_file}')
 
 def run(args, input_dir, model_dir):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')

@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
@@ -29,6 +31,14 @@ class LossHistory:
 def get_class_names(df):
     labels = df['{{ cookiecutter.label_column }}']
     return labels.unique()
+
+def save_dist(dist, dist_file):
+    fig = plt.figure(figsize=(16, 24))
+    sns.barplot(
+        y=dist.sort_values(ascending=False).index,
+        x=dist.sort_values(ascending=False).values, palette='Reds')
+    plt.title('Class Distribution in Predictions')
+    plt.savefig(dist_file)
 
 def search_layer(module, layer_type, reverse=True):
     if isinstance(module, layer_type):
