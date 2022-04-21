@@ -15,15 +15,10 @@ parameters:
     min: 0.0
     max: 0.02
     q: 0.01
-  batch_size:
-    distribution: q_uniform
-    min: 16
-    max: 32
-    q: 8
   image_size:
     distribution: q_uniform
-    min: 128
-    max: 400
+    min: 136
+    max: 264
     q: 16
   crop_size:
     distribution: q_uniform
