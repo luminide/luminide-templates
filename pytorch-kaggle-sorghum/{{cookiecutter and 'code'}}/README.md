@@ -27,9 +27,9 @@ The CSV file is expected to have labels under a column named `{{ cookiecutter.la
 2017-06-02__16-48-57-866.jpg,PI_154987
 2017-06-12__13-18-07-707.jpg,PI_92270
 ```
-If an item has multiple labels, they should be separated by a space character as shown.
 
 ### Using this repo with Luminide
+- Accept [competition rules](https://www.kaggle.com/competitions/sorghum-id-fgvc-9/rules).
 - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
 - Attach a Compute Server with a GPU (e.g. gcp-t4).
 - On the `Import Data` data tab, choose Kaggle and then enter `anlthms/sorghum1` (User Dataset).
@@ -41,6 +41,7 @@ If an item has multiple labels, they should be separated by a space character as
 - After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
 - Use the `Experiment Tracking` menu to track experiments.
 - Launch inference.sh to create submission.csv and use submit.sh to upload it to Kaggle.
+- Check the [leaderboard](https://www.kaggle.com/competitions/sorghum-id-fgvc-9/leaderboard) to see your score!
 
 {%- if cookiecutter.data_subset_percentage != '100' %}
 

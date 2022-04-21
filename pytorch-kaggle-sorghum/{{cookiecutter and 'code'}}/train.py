@@ -56,7 +56,7 @@ device = torch.device(device_type)
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, num_patches, print_interval=100, subset=100):
+            checkpoint, num_patches=9, print_interval=100, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device

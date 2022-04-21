@@ -1,6 +1,6 @@
 parameters:
   arch:
-    values: ['resnet18', 'efficientnet_b3', 'seresnext50_32x4d']
+    values: ['resnet50', 'seresnext50_32x4d', 'efficientnet_b3']
   dropout_rate:
     distribution: q_uniform
     min: 0.0
