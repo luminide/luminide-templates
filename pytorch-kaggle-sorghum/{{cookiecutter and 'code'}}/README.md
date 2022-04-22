@@ -28,24 +28,27 @@ The CSV file is expected to have labels under a column named `{{ cookiecutter.la
 2017-06-12__13-18-07-707.jpg,PI_92270
 ```
 
-### Using this repo with Luminide
+### Quick recipe for using this repo with Luminide
 - Accept [competition rules](https://www.kaggle.com/competitions/sorghum-id-fgvc-9/rules).
+- Attach a Compute Server that has a GPU (e.g. gcp-t4).
 - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
-- Attach a Compute Server with a GPU (e.g. gcp-t4).
-- On the `Import Data` data tab, choose Kaggle and then enter `anlthms/sorghum1` (User Dataset).
-- For exploratory analysis, run [eda.ipynb](eda.ipynb).
-- To train, use the `Run Experiment` menu.
-- To monitor training progress, use the `Experiment Visualization` menu.
-- To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
-- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab. Tuned values will be copied back to a file called `config-tuned.yaml` along with visualizations in `sweep-results.html`.
-- After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
-- Use the `Experiment Tracking` menu to track experiments.
-- Launch inference.sh to create submission.csv and use submit.sh to upload it to Kaggle.
+- On the `Import Data` tab, choose Kaggle and then enter `anlthms/sorghum1` (User Dataset).
+- Train a model using the `Run Experiment` menu.
+- Launch inference.sh from the `Run Experiment` tab to create a submission and use submit.sh to upload it to Kaggle.
 - Check the [leaderboard](https://www.kaggle.com/competitions/sorghum-id-fgvc-9/leaderboard) to see your score!
+
+### Additional features
+- Use the `Experiment Tracking` menu to track experiments.
+- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab. Tuned values will be copied back to a file called `config-tuned.yaml` along with visualizations in `sweep-results.html`.
+- To use the tuned hyperparameter values, copy them over to `config.yaml` before training a model.
+- For exploratory analysis, run [eda.ipynb](eda.ipynb).
+- To monitor training progress, use the `Experiment Visualization` menu.
+- After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
+- To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
 
 {%- if cookiecutter.data_subset_percentage != '100' %}
 
-Note: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
+**NOTE**: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
 {%- endif %}
 
 
