@@ -1,3 +1,4 @@
+import random
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
@@ -11,7 +12,10 @@ class SegmentGreen(A.ImageOnlyTransform):
 
     def apply(self, img, **params):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, (32, 0, 40) , (179, 255, 164))
+        hmin = random.randrange(25, 35)
+        vmin = random.randrange(30, 70)
+        smax = random.randrange(150, 180)
+        mask = cv2.inRange(hsv, (hmin, 0, vmin) , (179, smax, 255))
         img = cv2.bitwise_and(img, img, mask=mask)
         return img
 

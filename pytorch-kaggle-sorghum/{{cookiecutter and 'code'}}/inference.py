@@ -17,6 +17,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     '-n', '--num-patches', default=9, type=int, metavar='N',
     help='number of patches per image')
+parser.add_argument(
+    '-e', '--ensemble', dest='ensemble', action='store_true',
+    help='ensemble predictions')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
@@ -50,7 +53,6 @@ def create_model(model_dir, num_classes):
     return model, conf
 
 def test(loader, model, num_classes, num_patches):
-    sigmoid = nn.Sigmoid()
     preds = np.zeros((len(loader.dataset), num_classes), dtype=np.float32)
     start_idx = 0
     model.eval()
@@ -64,11 +66,10 @@ def test(loader, model, num_classes, num_patches):
             preds[start_idx:end_idx] = pred_batch
             start_idx = end_idx
 
+    # average predictions from patches
     assert preds.shape[0] % num_patches == 0
     preds = preds.reshape((preds.shape[0]//num_patches, num_patches, -1))
-    # average predictions from patches
-    preds = preds.mean(axis=1).argmax(axis=1)
-    return preds
+    return preds.mean(axis=1)
 
 def collapse(filenames, num_patches):
     filenames = filenames.iloc[::num_patches]
@@ -87,6 +88,18 @@ def save_results(df, preds, class_names, num_patches):
     save_dist(results['{{ cookiecutter.label_column }}'].value_counts(), dist_file)
     print(f'\nSaved predicted class distribution to {dist_file}')
 
+def ensemble():
+    pred_files = sorted(glob('*.npy'))
+    if len(pred_files) == 0:
+        print('error: no npy files found')
+        return None
+    basenames = [os.path.basename(f) for f in pred_files]
+    print(f'ensembling predictions: {basenames}...')
+    preds_list = []
+    for filename in pred_files:
+        preds_list.append(np.load(filename))
+    return np.stack(preds_list).mean(axis=0)
+
 def run(args, input_dir, model_dir):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
     train_df = pd.read_csv(meta_file, dtype=str)
@@ -96,10 +109,22 @@ def run(args, input_dir, model_dir):
 
     model, conf = create_model(model_dir, num_classes)
     loader, df = create_test_loader(conf, input_dir, class_names)
-    preds = test(loader, model, num_classes, args.num_patches)
-    save_results(df, preds, class_names, args.num_patches)
+    if args.ensemble:
+        preds = ensemble()
+        if preds is None:
+            return
+    else:
+        print('running inference on test set...')
+        print(conf)
+        preds = test(loader, model, num_classes, args.num_patches)
+        i = 0
+        while os.path.exists(f'preds{i}.npy'):
+            i += 1
+        np.save(f'preds{i}.npy', preds)
+    pred_labels = preds.argmax(axis=1)
+    save_results(df, pred_labels, class_names, args.num_patches)
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    run(args, '../input', './')
-
+    input_dir = '../input'
+    run(args, input_dir, './')
