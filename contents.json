@@ -33,6 +33,12 @@
             "tags": [ "detectron2", "Computer Vision", "Segmentation" ]
         },
         {
+            "name": "Audio Classification",
+            "description": "Audio classification with PyTorch",
+            "directory": "pytorch-audio-classification",
+            "tags": [ "PyTorch", "timm", "Classification" ]
+        },
+        {
             "name": "Sorghum -100 Cultivar Identification - FGVC 9",
             "description": "Image classification with PyTorch",
             "directory": "pytorch-kaggle-sorghum",
