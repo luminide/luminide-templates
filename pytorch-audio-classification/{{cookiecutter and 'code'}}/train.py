@@ -17,11 +17,11 @@ from torch import autocast
 from torch.cuda.amp import GradScaler 
 {%- endif %}
 
-from augment import make_train_augmenter
-from dataset import VisionDataset
+from augment import make_train_augmenters
+from dataset import AudioDataset
 from models import ModelWrapper
 from config import Config
-from util import LossHistory, get_class_names, make_test_augmenter
+from util import LossHistory, get_class_names, make_test_augmenters
 
 
 parser = argparse.ArgumentParser()
@@ -88,19 +88,19 @@ class Trainer:
 
         # shuffle
         df = df.sample(frac=1, random_state=0).reset_index(drop=True)
-        train_aug = make_train_augmenter(conf)
-        test_aug = make_test_augmenter(conf)
+        train_audio_aug, train_image_aug = make_train_augmenters(conf)
+        test_audio_aug, test_image_aug = make_test_augmenters(conf)
 
         # split into train and validation sets
         split = df.shape[0]*90//100
         train_df = df.iloc[:split].reset_index(drop=True)
         val_df = df.iloc[split:].reset_index(drop=True)
-        train_dataset = VisionDataset(
-            train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, train_aug, subset)
-        val_dataset = VisionDataset(
-            val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, test_aug, subset)
+        train_dataset = AudioDataset(
+            train_df, conf, self.input_dir, '{{ cookiecutter.train_audio_dir }}',
+            class_names, train_audio_aug, train_image_aug, subset)
+        val_dataset = AudioDataset(
+            val_df, conf, self.input_dir, '{{ cookiecutter.train_audio_dir }}',
+            class_names, test_audio_aug, test_image_aug, subset)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
@@ -179,20 +179,20 @@ class Trainer:
         assert val_interval > 0
         train_loss_list = []
         model.train()
-        for step, (images, labels) in enumerate(self.train_loader):
+        for step, (inputs, labels) in enumerate(self.train_loader):
             if (step + 1) % val_interval == 0:
                 model.eval()
                 # collect validation history for tuning
                 try:
                     with torch.no_grad():
-                        val_images, val_labels = next(val_iter)
-                        val_images = val_images.to(device)
+                        val_inputs, val_labels = next(val_iter)
+                        val_inputs = val_inputs.to(device)
                         val_labels = val_labels.to(device)
 {%- if cookiecutter.AMP == "True" %}
                         with autocast(device_type, enabled=self.use_amp):
-                            val_outputs = model(val_images)
+                            val_outputs = model(val_inputs)
 {%- elif cookiecutter.AMP == "False" %}
-                        val_outputs = model(val_images)
+                        val_outputs = model(val_inputs)
 {%- endif %}
                         val_loss = loss_func(val_outputs, val_labels)
                         self.history.add_val_loss(epoch, self.sample_count, val_loss.item())
@@ -201,21 +201,21 @@ class Trainer:
                 # switch back to training mode
                 model.train()
 
-            images = images.to(device)
+            inputs = inputs.to(device)
             labels = labels.to(device)
             # compute output
 {%- if cookiecutter.AMP == "True" %}
             # use AMP
             with autocast(device_type, enabled=self.use_amp):
-                outputs = model(images)
+                outputs = model(inputs)
                 loss = loss_func(outputs, labels)
 {%- elif cookiecutter.AMP == "False" %}
-            outputs = model(images)
+            outputs = model(inputs)
             loss = loss_func(outputs, labels)
 {%- endif %}
 
             train_loss_list.append(loss.item())
-            self.sample_count += images.shape[0]
+            self.sample_count += inputs.shape[0]
             self.history.add_train_loss(epoch, self.sample_count, loss.item())
             if (step + 1) % self.print_interval == 0:
                 print(f'Batch {step + 1}: training loss {loss.item():.5f}')
@@ -247,14 +247,14 @@ class Trainer:
         start_idx = 0
         self.model.eval()
         with torch.no_grad():
-            for images, labels in self.val_loader:
-                images = images.to(device)
+            for inputs, labels in self.val_loader:
+                inputs = inputs.to(device)
                 labels = labels.to(device)
 {%- if cookiecutter.AMP == "True" %}
                 with autocast(device_type, enabled=self.use_amp):
-                    outputs = self.model(images)
+                    outputs = self.model(inputs)
 {%- elif cookiecutter.AMP == "False" %}
-                outputs = self.model(images)
+                outputs = self.model(inputs)
 {%- endif %}
                 end_idx = start_idx + outputs.shape[0]
                 all_labels[start_idx:end_idx] = labels.cpu().numpy()

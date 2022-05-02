@@ -47,21 +47,10 @@ def search_layer(module, layer_type, reverse=True):
             return res
     return None
 
-{% if cookiecutter.augmentation == "True" -%}
-def make_test_augmenter(conf):
-    crop_size = round(conf.image_size*conf.crop_size)
-    return  A.Compose([
-        A.CenterCrop(height=crop_size, width=crop_size),
+def make_test_augmenters(conf):
+    audio_aug = None
+    image_aug = A.Compose([
         A.Normalize(),
         ToTensorV2()
     ])
-
-{% elif cookiecutter.augmentation == "False" -%}
-def make_test_augmenter(conf):
-    aug_list = [
-        A.Normalize(),
-        ToTensorV2()
-    ]
-
-    return A.Compose(aug_list)
-{%- endif %}
+    return  audio_aug, image_aug

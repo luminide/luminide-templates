@@ -5,8 +5,8 @@
 
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
-python3 ../code/train.py --epochs 5
+python3 ../code/train.py --epochs 15
 {%- else %}
 
-python3 ../code/train.py --epochs 5 --subset {{ cookiecutter.data_subset_percentage }}
+python3 ../code/train.py --epochs 15 --subset {{ cookiecutter.data_subset_percentage }}
 {%- endif %}

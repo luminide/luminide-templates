@@ -7,7 +7,7 @@ import torch
 from torch import nn
 import torch.utils.data as data
 
-from util import get_class_names, make_test_augmenter
+from util import get_class_names, make_test_augmenters
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
@@ -16,18 +16,18 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
 
 def create_test_loader(conf, input_dir, class_names):
-    test_aug = make_test_augmenter(conf)
+    test_audio_aug, test_image_aug = make_test_augmenters(conf)
 
-    image_dir = 'test_images'
+    data_dir = 'test'
     test_df = pd.DataFrame()
-    image_files = sorted(glob(f'{input_dir}/{image_dir}/*.*'))
-    assert len(image_files) > 0, f'No files inside {input_dir}/{image_dir}'
-    image_files = [os.path.basename(filename) for filename in image_files]
-    test_df['image'] = image_files
+    data_files = sorted(glob(f'{input_dir}/{data_dir}/*.*'))
+    assert len(data_files) > 0, f'No files inside {input_dir}/{data_dir}'
+    data_files = [os.path.basename(filename) for filename in data_files]
+    test_df['filename'] = data_files
     test_df['labels'] = class_names[0]
     test_dataset = VisionDataset(
-        test_df, conf, input_dir, image_dir,
-        class_names, test_aug)
+        test_df, conf, input_dir, data_dir,
+        class_names, test_audio_aug, test_image_aug)
     print(f'{len(test_dataset)} examples in test set')
     loader = data.DataLoader(
         test_dataset, batch_size=conf.batch_size, shuffle=False,
@@ -49,9 +49,9 @@ def test(loader, model, num_classes):
     start_idx = 0
     model.eval()
     with torch.no_grad():
-        for images, _ in loader:
-            images = images.to(device)
-            outputs = model(images)
+        for inputs, _ in loader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
             # multi-label classification:
             # set the prediction to 1 iff sigmoid(output) >= 0.5
             pred_batch = sigmoid(outputs).round().cpu().numpy()

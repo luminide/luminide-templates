@@ -1,27 +1,32 @@
 # this can be any network from the timm library
-arch: resnet18
+arch: resnet50
 pretrained: true
 dropout_rate: 0.5
 
-# resize images to this size on the fly
-image_size: {{ cookiecutter.image_size }}
-# crop to this fraction of image_size
-crop_size: 0.8
+# resize spectrograms to this size on the fly
+spectrogram_width: {{ cookiecutter.spectrogram_width }}
 
 # optimizer settings
 optim: sgd
-lr: 0.001
+lr: 0.01
 weight_decay: 0.01
-batch_size: 32
+batch_size: 128
 
 # scheduler settings
 gamma: 0.96
 
-{%- if cookiecutter.augmentation == "True" %}
-
 # data augmentation
-aug_prob: 0.1
-strong_aug: false
-max_cutout: 0
+image_aug_prob: 0.2
+audio_aug_prob: 0.2
+max_cutout: 10
 
-{%- endif %}
+# audio duration in seconds
+duration: 5
+# starting offset in seconds
+offset: 1
+sample_rate: 32000
+min_freq: 500
+max_freq: 12500
+num_mels: 128
+num_fft: 1024
+hop_length: 512
