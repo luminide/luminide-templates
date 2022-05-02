@@ -1,12 +1,11 @@
 {
-    "project_description": "Image classification",
+    "project_description": "Audio classification",
     "train_metadata": "train.csv",
-    "train_image_dir": "train_images",
-    "image_column": "image",
+    "train_audio_dir": "train_audio",
+    "file_column": "files",
     "label_column": "labels",
-    "image_size": 64,
-    "data_subset_percentage": 50,
-    "augmentation": ["True", "False"],
+    "spectrogram_width": 256,
+    "data_subset_percentage": 100,
     "AMP": ["True", "False"],
     "Kaggle": ["False", "True"]
 }

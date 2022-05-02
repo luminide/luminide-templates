@@ -15,7 +15,8 @@
                 "Computer Vision",
                 "Classification",
                 "Segmentation",
-                "Kaggle"
+                "Kaggle",
+                "Multi-label"
             ]
         }
     ],
@@ -24,7 +25,7 @@
             "name": "Image Classification",
             "description": "Image classification with PyTorch",
             "directory": "pytorch-image-classification",
-            "tags": [ "PyTorch", "timm", "Computer Vision", "Classification" ]
+            "tags": [ "PyTorch", "timm", "Computer Vision", "Classification", "Multi-label"]
         },
         {
             "name": "Instance Segmentation",
@@ -36,7 +37,7 @@
             "name": "Audio Classification",
             "description": "Audio classification with PyTorch",
             "directory": "pytorch-audio-classification",
-            "tags": [ "PyTorch", "timm", "Classification" ]
+            "tags": [ "PyTorch", "timm", "Classification", "Multi-label"]
         },
         {
             "name": "Sorghum -100 Cultivar Identification - FGVC 9",
