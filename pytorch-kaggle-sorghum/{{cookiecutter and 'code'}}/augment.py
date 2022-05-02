@@ -11,7 +11,7 @@ class SegmentGreen(A.ImageOnlyTransform):
         super(SegmentGreen, self).__init__(always_apply, p)
 
     def apply(self, img, **params):
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         hmin = random.randrange(25, 35)
         vmin = random.randrange(30, 70)
         smax = random.randrange(150, 180)
