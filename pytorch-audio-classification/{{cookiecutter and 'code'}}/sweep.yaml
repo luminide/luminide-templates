@@ -13,8 +13,8 @@ parameters:
   weight_decay:
     distribution: q_uniform
     min: 0.0
-    max: 0.1
-    q: 0.01
+    max: 0.01
+    q: 0.001
   num_mels:
     distribution: q_uniform
     min: 64

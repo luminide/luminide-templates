@@ -8,7 +8,7 @@ from torch import nn
 import torch.utils.data as data
 
 from util import get_class_names, make_test_augmenters
-from dataset import VisionDataset
+from dataset import AudioDataset
 from models import ModelWrapper
 from config import Config
 
@@ -25,7 +25,7 @@ def create_test_loader(conf, input_dir, class_names):
     data_files = [os.path.basename(filename) for filename in data_files]
     test_df['filename'] = data_files
     test_df['labels'] = class_names[0]
-    test_dataset = VisionDataset(
+    test_dataset = AudioDataset(
         test_df, conf, input_dir, data_dir,
         class_names, test_audio_aug, test_image_aug)
     print(f'{len(test_dataset)} examples in test set')
@@ -43,8 +43,19 @@ def create_model(model_dir, num_classes):
     model.load_state_dict(checkpoint['model'])
     return model, conf
 
-def test(loader, model, num_classes):
+def predict_batch(outputs, threshold):
     sigmoid = nn.Sigmoid()
+    # multi-label classification:
+    # first, set prediction to 1 if probability >= threshold
+    pred_batch = sigmoid(outputs).cpu().numpy() >= threshold
+    num_rows = pred_batch.shape[0]
+    # for each example, pick the label that was predicted as most likely
+    max_inds = outputs.argmax(axis=1).cpu().numpy()
+    # this is to make sure that at least one class is predicted
+    pred_batch[range(num_rows), max_inds] = 1
+    return pred_batch
+
+def test(loader, model, num_classes, threshold):
     preds = np.zeros((len(loader.dataset), num_classes), dtype=np.float32)
     start_idx = 0
     model.eval()
@@ -52,16 +63,8 @@ def test(loader, model, num_classes):
         for inputs, _ in loader:
             inputs = inputs.to(device)
             outputs = model(inputs)
-            # multi-label classification:
-            # set the prediction to 1 iff sigmoid(output) >= 0.5
-            pred_batch = sigmoid(outputs).round().cpu().numpy()
-            num_rows = pred_batch.shape[0]
-            # for each example, pick the label that was predicted as most likely
-            max_inds = outputs.argmax(axis=1).cpu().numpy()
-            # this is to make sure that at least one class is predicted
-            pred_batch[range(num_rows), max_inds] = 1
-            end_idx = start_idx + num_rows
-            preds[start_idx:end_idx] = pred_batch
+            end_idx = start_idx + outputs.shape[0]
+            preds[start_idx:end_idx] = predict_batch(outputs, threshold)
             start_idx = end_idx
     return preds
 
@@ -73,7 +76,7 @@ def save_results(df, preds, class_names):
     df.to_csv('submission.csv', index=False)
     print('Saved submission.csv')
 
-def run(input_dir, model_dir):
+def run(input_dir, model_dir, threshold):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
     train_df = pd.read_csv(meta_file, dtype=str)
     class_names = np.array(get_class_names(train_df))
@@ -81,9 +84,9 @@ def run(input_dir, model_dir):
 
     model, conf = create_model(model_dir, num_classes)
     loader, df = create_test_loader(conf, input_dir, class_names)
-    preds = test(loader, model, num_classes)
+    preds = test(loader, model, num_classes, threshold)
     save_results(df, preds, class_names)
 
 if __name__ == '__main__':
-    run('../input', './')
+    run('../input', './', 0.5)
 
