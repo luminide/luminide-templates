@@ -14,13 +14,14 @@ from torch import nn
 import torch.utils.data as data
 {%- if cookiecutter.AMP == "True" %}
 from torch import autocast
-from torch.cuda.amp import GradScaler 
+from torch.cuda.amp import GradScaler
 {%- endif %}
 
 from augment import make_train_augmenters
 from dataset import AudioDataset
 from models import ModelWrapper
 from config import Config
+from inference import predict_batch
 from util import LossHistory, get_class_names, make_test_augmenters
 
 
@@ -57,7 +58,7 @@ class Trainer:
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
-        self.max_patience = 10
+        self.max_patience = 15
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
@@ -237,7 +238,7 @@ class Trainer:
         mean_train_loss = np.array(train_loss_list).mean()
         return mean_train_loss
 
-    def validate(self):
+    def validate(self, threshold=0.5):
         loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
@@ -258,7 +259,7 @@ class Trainer:
 {%- endif %}
                 end_idx = start_idx + outputs.shape[0]
                 all_labels[start_idx:end_idx] = labels.cpu().numpy()
-                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+                preds[start_idx:end_idx] = predict_batch(outputs, threshold)
                 start_idx = end_idx
                 losses.append(loss_func(outputs, labels).item())
 
