@@ -30,3 +30,7 @@ max_freq: 12500
 num_mels: 128
 num_fft: 1024
 hop_length: 512
+
+# if the predicted probability is >= this value,
+# consider it positive
+prob_threshold: 0.3
