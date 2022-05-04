@@ -1,0 +1,11 @@
+{
+    "project_description": "Audio classification",
+    "train_metadata": "train.csv",
+    "train_audio_dir": "train_audio",
+    "file_column": "files",
+    "label_column": "labels",
+    "spectrogram_width": 256,
+    "data_subset_percentage": 100,
+    "AMP": ["True", "False"],
+    "Kaggle": ["False", "True"]
+}

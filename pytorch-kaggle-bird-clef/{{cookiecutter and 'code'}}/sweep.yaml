@@ -1,0 +1,35 @@
+parameters:
+  arch:
+    values: ['resnet50', 'efficientnet_b3']
+  dropout_rate:
+    distribution: q_uniform
+    min: 0.0
+    max: 0.75
+    q: 0.25
+  lr:
+    distribution: log_uniform
+    min: 0.01
+    max: 0.1
+  weight_decay:
+    distribution: q_uniform
+    min: 0.0
+    max: 0.01
+    q: 0.001
+  num_mels:
+    distribution: q_uniform
+    min: 64
+    max: 128
+    q: 64
+  hop_length:
+    distribution: q_uniform
+    min: 256
+    max: 512
+    q: 256
+  image_aug_prob:
+    distribution: uniform
+    min: 0.2
+    max: 0.8
+  audio_aug_prob:
+    distribution: uniform
+    min: 0.2
+    max: 0.4
