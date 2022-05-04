@@ -4,7 +4,7 @@
     "train_audio_dir": "train_audio",
     "file_column": "filename",
     "label_column": "primary_label",
-    "spectrogram_width": 256,
+    "spectrogram_width": 128,
     "data_subset_percentage": 100,
     "AMP": ["True", "False"]
 }

@@ -1,5 +1,6 @@
 import os
 import cv2
+import random
 import librosa
 import numpy as np
 import torch.utils.data as data
@@ -47,27 +48,33 @@ class AudioDataset(data.Dataset):
         else:
             filename = self.files[index]
             label = self.labels[index]
-            offset = conf.offset
+            total_duration = librosa.get_duration(filename=filename)
+            if total_duration < conf.duration:
+                offset = 0
+            else:
+                offset = random.uniform(0, total_duration - conf.duration)
             duration = conf.duration
         assert os.path.isfile(filename)
 
-        num_samples =  conf.duration*conf.sample_rate
+        sample_count =  conf.duration*conf.sample_rate
         sound, rate = librosa.load(
             filename, sr=conf.sample_rate, offset=offset, duration=duration)
-        while (sound.shape[0] < num_samples):
+        while (sound.shape[0] < sample_count):
             # pad to required length by duplicating data
-            sound = np.hstack((sound, sound[:(num_samples - sound.shape[0])]))
-        assert sound.shape[0] == num_samples
+            sound = np.hstack((sound, sound[:(sample_count - sound.shape[0])]))
+        assert sound.shape[0] == sample_count
 
         if self.audio_transform:
             sound = self.audio_transform(samples=sound, sample_rate=conf.sample_rate)
-        assert sound.shape[0] == num_samples
+        assert sound.shape[0] == sample_count
         spec = librosa.feature.melspectrogram(
             y=sound, sr=conf.sample_rate, n_fft=conf.num_fft, hop_length=conf.hop_length,
             n_mels=conf.num_mels,  fmin=conf.min_freq, fmax=conf.max_freq)
         img = librosa.power_to_db(spec, ref=np.max)
         img -= img.min()
-        img /= img.max()
+        max_val = img.max()
+        if max_val != 0:
+            img /= max_val
         img *= 255
         img = img.round().astype(np.uint8)
         img = cv2.resize(

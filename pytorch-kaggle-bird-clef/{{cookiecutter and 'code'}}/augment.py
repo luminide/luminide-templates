@@ -1,7 +1,20 @@
-import albumentations as A
+import random
 import audiomentations as AA
+from audiomentations.core.transforms_interface import BaseWaveformTransform
+import noisereduce as nr
+import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
+
+class DenoiseTransform(BaseWaveformTransform):
+
+    def __init__(self, num_fft, p=0.5):
+        super().__init__(p)
+        self.num_fft = num_fft
+
+    def apply(self, samples, sr):
+        level = random.random()
+        return nr.reduce_noise(y=samples, sr=sr, prop_decrease=level, n_fft=self.num_fft)
 
 def make_audio_augmenter(conf):
     p = conf.audio_aug_prob
@@ -13,6 +26,7 @@ def make_audio_augmenter(conf):
             AA.AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=0.2*p),
             AA.AddGaussianSNR(p=0.2*p),
             AA.ClippingDistortion(min_percentile_threshold=20, max_percentile_threshold=40, p=0.2*p),
+            DenoiseTransform(conf.num_fft, p=0.5*p)
         ], p=p),
         AA.Gain(min_gain_in_db=-12, max_gain_in_db=12, p=0.2*p),
     ]

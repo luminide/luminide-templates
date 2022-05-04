@@ -43,6 +43,9 @@ parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
     help='path to saved model')
 parser.add_argument(
+    '--validate', default='', type=str, metavar='PATH',
+    help='path to saved model to validate')
+parser.add_argument(
     '-s', '--subset', default=100, type=int, metavar='N',
     help='use a percentage of the data for training and validation')
 parser.add_argument(
@@ -266,7 +269,7 @@ class Trainer:
                 losses.append(loss_func(outputs, labels).item())
 
         if np.isfinite(preds).all():
-            score = f1_score(all_labels, preds, average='micro')
+            score = f1_score(all_labels, preds, average='macro')
         else:
             score = np.nan
         return np.mean(losses), score
@@ -286,7 +289,7 @@ def main():
         torch.manual_seed(args.seed)
         cudnn.deterministic = True
     input_dir = args.input
-    model_file = args.resume
+    model_file = args.resume or args.validate
     if model_file:
         print(f'Loading model from {model_file}')
         checkpoint = torch.load(model_file)
@@ -299,7 +302,11 @@ def main():
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
         checkpoint, args.print_interval, args.subset)
-    trainer.fit(args.epochs)
+    if args.validate:
+        loss, score = trainer.validate()
+        print(f'Validation loss {loss:.4} score {score:.4}')
+    else:
+        trainer.fit(args.epochs)
 
 
 if __name__ == '__main__':

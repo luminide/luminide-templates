@@ -34,6 +34,7 @@ If an item has multiple labels, they should be separated by a space character as
 - Attach a Compute Server that has a GPU (e.g. gcp-t4).
 - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
 - On the `Import Data` tab, choose Kaggle and then enter `birdclef-2022`.
+- Run [install.sh](install.sh) as a custom experiment to install required packages on the Compute Server.
 - Train a model using the `Run Experiment` menu.
 
 ### Kaggle submission
@@ -55,9 +56,12 @@ If an item has multiple labels, they should be separated by a space character as
 - To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
 
 
+### Acknowledgements
+- The network architecture for the attention head is adapted from a [notebook by tattaka](https://www.kaggle.com/code/tattaka/birdclef2022-submission-baseline)
+
 {%- if cookiecutter.data_subset_percentage != '100' %}
 
-Note: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
+**Note**: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
 {%- endif %}
 
 
