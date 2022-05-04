@@ -29,28 +29,31 @@ The CSV file is expected to have labels under a column named `{{ cookiecutter.la
 ```
 If an item has multiple labels, they should be separated by a space character as shown.
 
-### Using this repo with Luminide
-- Attach a Compute Server and download a dataset. An example dataset is available at gs://luminide-example-bird-calls.
-- Run `install.sh` from the `Run Experiment` tab to install required software on the Compute Server.
-- For exploratory analysis, run [eda.ipynb](eda.ipynb).
-- To train, use the `Run Experiment` menu.
-- To monitor training progress, use the `Experiment Visualization` menu.
-- To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
-- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab. Tuned values will be copied back to a file called `config-tuned.yaml` along with visualizations in `sweep-results.html`.
-- After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
+### To use this repo with Luminide
+- Accept [competition rules](https://www.kaggle.com/competitions/birdclef-2022/rules).
+- Attach a Compute Server that has a GPU (e.g. gcp-t4).
+- Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
+- On the `Import Data` tab, choose Kaggle and then enter `birdclef-2022`.
+- Train a model using the `Run Experiment` menu.
+
+### Kaggle submission
+- Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle as a dataset.
+- To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook.
+- Add the notebook output of `https://www.kaggle.com/luminide/wheels1` as Data.
+- Add your dataset at `https://www.kaggle.com/<kaggle_username>/kagglecode` as Data.
+- Add the relevant competition dataset as Data.
+- Run the notebook after turning off the `Internet` setting.
+- Check the [leaderboard](https://www.kaggle.com/competitions/birdclef-2022/leaderboard) to see your score!
+
+### Additional features
 - Use the `Experiment Tracking` menu to track experiments.
+- To tune the hyperparameters, edit [sweep.yaml](sweep.yaml) as desired and launch a sweep from the `Run Experiment` tab. Tuned values will be copied back to a file called `config-tuned.yaml` along with visualizations in `sweep-results.html`.
+- To use the tuned hyperparameter values, copy them over to `config.yaml` before training a model.
+- For exploratory analysis, run [eda.ipynb](eda.ipynb).
+- To monitor training progress, use the `Experiment Visualization` menu.
+- After an experiment is complete, use the file browser on the IDE interface to access the results on the IDE Server.
+- To generate a report on the most recent training session, run report.sh from the `Run Experiment` tab. Make sure `Track Experiment` is checked. The results will be copied back to a file called `report.html`.
 
-{% if cookiecutter.Kaggle == "True" -%}
-- To use this repo for a Kaggle code competition:
-    - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
-    - Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle.
-    - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook.
-    - Add the notebook output of `https://www.kaggle.com/luminide/wheels1` as Data.
-    - Add your dataset at `https://www.kaggle.com/<kaggle_username>/kagglecode` as Data.
-    - Add the relevant competition dataset as Data.
-    - Run the notebook after turning off the `Internet` setting.
-
-{%- endif %}
 
 {%- if cookiecutter.data_subset_percentage != '100' %}
 

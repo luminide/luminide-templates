@@ -1,11 +1,10 @@
 {
-    "project_description": "Audio classification",
-    "train_metadata": "train.csv",
+    "project_description": "BirdCLEF 2022",
+    "train_metadata": "train_metadata.csv",
     "train_audio_dir": "train_audio",
-    "file_column": "files",
-    "label_column": "labels",
+    "file_column": "filename",
+    "label_column": "primary_label",
     "spectrogram_width": 256,
     "data_subset_percentage": 100,
-    "AMP": ["True", "False"],
-    "Kaggle": ["False", "True"]
+    "AMP": ["True", "False"]
 }

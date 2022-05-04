@@ -27,7 +27,7 @@ class LossHistory:
         df.to_csv('history.csv', index=False)
 
 def get_class_names(df):
-    labels = df['{{ cookiecutter.label_column }}']
+    labels = df['labels']
     return labels.unique()
 
 def search_layer(module, layer_type, reverse=True):
