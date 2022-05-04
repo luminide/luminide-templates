@@ -13,6 +13,7 @@
             "name": "Problem type",
             "tags": [
                 "Computer Vision",
+                "Audio",
                 "Classification",
                 "Segmentation",
                 "Kaggle",
@@ -37,13 +38,19 @@
             "name": "Audio Classification",
             "description": "Audio classification with PyTorch",
             "directory": "pytorch-audio-classification",
-            "tags": [ "PyTorch", "timm", "Classification", "Multi-label"]
+            "tags": [ "PyTorch", "timm", "Audio", "Classification", "Multi-label"]
         },
         {
             "name": "Sorghum -100 Cultivar Identification - FGVC 9",
             "description": "Image classification with PyTorch",
             "directory": "pytorch-kaggle-sorghum",
             "tags": [ "PyTorch", "timm", "Computer Vision", "Classification", "Kaggle" ]
-        }
+        },
+        {
+            "name": "BirdCLEF 2022",
+            "description": "Identify bird calls in soundscapes",
+            "directory": "pytorch-kaggle-bird-clef",
+            "tags": [ "PyTorch", "timm", "Audio", "Classification", "Multi-label"]
+        },
     ]
 }
