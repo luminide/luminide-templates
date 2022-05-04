@@ -22,6 +22,7 @@ from dataset import AudioDataset
 from models import ModelWrapper
 from config import Config
 from inference import predict_batch
+from prep import prep_metadata
 from util import LossHistory, get_class_names, make_test_augmenters
 
 
@@ -81,10 +82,11 @@ class Trainer:
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
-        meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
-        assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
+        prep_metadata(self.input_dir)
+        meta_file = 'train.csv'
         df = pd.read_csv(meta_file, dtype=str)
         class_names = get_class_names(df)
+        print(f'{len(class_names)} classes: {class_names}')
         self.num_classes = len(class_names)
 
         # shuffle
@@ -238,7 +240,7 @@ class Trainer:
         mean_train_loss = np.array(train_loss_list).mean()
         return mean_train_loss
 
-    def validate(self, threshold=0.5):
+    def validate(self):
         loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
@@ -259,7 +261,7 @@ class Trainer:
 {%- endif %}
                 end_idx = start_idx + outputs.shape[0]
                 all_labels[start_idx:end_idx] = labels.cpu().numpy()
-                preds[start_idx:end_idx] = predict_batch(outputs, threshold)
+                preds[start_idx:end_idx] = predict_batch(outputs, self.conf.prob_threshold)
                 start_idx = end_idx
                 losses.append(loss_func(outputs, labels).item())
 
