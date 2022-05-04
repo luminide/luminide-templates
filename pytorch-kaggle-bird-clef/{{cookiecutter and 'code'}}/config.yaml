@@ -1,5 +1,5 @@
 # this can be any network from the timm library
-arch: resnet50
+arch: efficientnet_b3
 pretrained: true
 dropout_rate: 0.5
 
@@ -7,8 +7,8 @@ dropout_rate: 0.5
 spectrogram_width: {{ cookiecutter.spectrogram_width }}
 
 # optimizer settings
-optim: sgd
-lr: 0.01
+optim: adam
+lr: 0.001
 weight_decay: 0.01
 batch_size: 128
 
@@ -22,8 +22,6 @@ max_cutout: 10
 
 # audio duration in seconds
 duration: 5
-# starting offset in seconds
-offset: 1
 sample_rate: 32000
 min_freq: 500
 max_freq: 12500
@@ -33,4 +31,4 @@ hop_length: 512
 
 # if the predicted probability is >= this value,
 # consider it positive
-prob_threshold: 0.3
+prob_threshold: 0.2
