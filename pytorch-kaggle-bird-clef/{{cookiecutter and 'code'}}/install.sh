@@ -1,3 +1,3 @@
-#!/bin/bash
+#!/bin/bash -x
 
-pip install -r ../code/requirements.txt
+pip install -q -r ../code/requirements.txt

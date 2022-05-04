@@ -65,7 +65,7 @@ def test(loader, model, num_classes, threshold):
     return preds
 
 def save_results(input_dir, df, preds, class_names):
-    class_map = {class_names[i]: i for i in range(len(class_names))}
+    class_map = {name: i for i, name in enumerate(class_names)}
     with open(f'{input_dir}/scored_birds.json') as json_file:
         birds = json.load(json_file)
 
