@@ -23,7 +23,7 @@ from models import ModelWrapper
 from config import Config
 from inference import predict_batch
 from prep import prep_metadata
-from util import LossHistory, get_class_names, make_test_augmenters
+from util import LossHistory, BCEFocalLoss, get_class_names, make_test_augmenters
 
 
 parser = argparse.ArgumentParser()
@@ -176,7 +176,7 @@ class Trainer:
         writer.close()
 
     def train_epoch(self, epoch):
-        loss_func = nn.BCEWithLogitsLoss()
+        loss_func = BCEFocalLoss()
         model = self.model
         optimizer = self.optimizer
 
@@ -269,7 +269,7 @@ class Trainer:
                 losses.append(loss_func(outputs, labels).item())
 
         if np.isfinite(preds).all():
-            score = f1_score(all_labels, preds, average='macro')
+            score = f1_score(all_labels, preds, average='micro')
         else:
             score = np.nan
         return np.mean(losses), score
