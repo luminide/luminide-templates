@@ -51,6 +51,6 @@
             "description": "Identify bird calls in soundscapes",
             "directory": "pytorch-kaggle-bird-clef",
             "tags": [ "PyTorch", "timm", "Audio", "Classification", "Multi-label"]
-        },
+        }
     ]
 }
