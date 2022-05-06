@@ -106,7 +106,7 @@ class Trainer:
             class_names, train_audio_aug, train_image_aug, subset)
         val_dataset = AudioDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_audio_dir }}',
-            class_names, test_audio_aug, test_image_aug, subset)
+            class_names, test_audio_aug, test_image_aug, subset, is_val=True)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
@@ -244,7 +244,7 @@ class Trainer:
         return mean_train_loss
 
     def validate(self):
-        loss_func = nn.BCEWithLogitsLoss()
+        loss_func = BCEFocalLoss()
         sigmoid = nn.Sigmoid()
         losses = []
         all_labels = np.zeros(
