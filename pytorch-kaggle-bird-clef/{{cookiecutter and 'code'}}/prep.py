@@ -22,7 +22,6 @@ def prep_metadata(input_dir):
         result['files'] = files
         result['labels'] = labels
         result.to_csv(f'train.csv', index=False)
-
     else:
         # train on the whole dataset
         result = pd.DataFrame()

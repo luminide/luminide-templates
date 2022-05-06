@@ -6,6 +6,11 @@ parameters:
     min: 0.0
     max: 0.75
     q: 0.25
+  label_smoothing:
+    distribution: q_uniform
+    min: 0.0
+    max: 0.05
+    q: 0.01
   lr:
     distribution: log_uniform
     min: 0.01
@@ -33,3 +38,7 @@ parameters:
     distribution: uniform
     min: 0.2
     max: 0.4
+  audio_mixup_prob:
+    distribution: uniform
+    min: 0.0
+    max: 0.5

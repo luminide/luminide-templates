@@ -11,11 +11,12 @@ warnings.simplefilter("ignore")
 class AudioDataset(data.Dataset):
     def __init__(
             self, df, conf, input_dir, imgs_dir,
-            class_names, audio_transform, image_transform, subset=100, is_test=False):
+            class_names, audio_transform, image_transform, subset=100, is_val=False, is_test=False):
         self.conf = conf
         self.audio_transform = audio_transform
         self.image_transform = image_transform
         self.is_test = is_test
+        self.is_val = is_val
 
         if subset != 100:
             assert subset < 100
@@ -30,43 +31,16 @@ class AudioDataset(data.Dataset):
 
         labels = df['labels']
         num_samples = len(files)
-        num_classes = len(class_names)
-        class_map = {class_names[i]: i for i in range(num_classes)}
-        self.labels = np.zeros((num_samples, num_classes), dtype=np.float32)
+        self.num_classes = len(class_names)
+        class_map = {class_names[i]: i for i in range(self.num_classes)}
+        self.sample_count =  conf.duration*conf.sample_rate
+        self.labels = np.zeros((num_samples, self.num_classes), dtype=np.float32)
         for i in range(num_samples):
             row_labels = [class_map[token] for token in labels[i].split(' ')]
             self.labels[i, row_labels] = 1.0
 
-    def __getitem__(self, index):
+    def get_spectrogram(self, sound):
         conf = self.conf
-        if self.is_test:
-            filename = self.files[index//12]
-            label = self.labels[index//12]
-            clip_idx = index%12
-            offset = clip_idx*5
-            duration = 5
-        else:
-            filename = self.files[index]
-            label = self.labels[index]
-            total_duration = librosa.get_duration(filename=filename)
-            if total_duration < conf.duration:
-                offset = 0
-            else:
-                offset = random.uniform(0, total_duration - conf.duration)
-            duration = conf.duration
-        assert os.path.isfile(filename)
-
-        sample_count =  conf.duration*conf.sample_rate
-        sound, rate = librosa.load(
-            filename, sr=conf.sample_rate, offset=offset, duration=duration)
-        while (sound.shape[0] < sample_count):
-            # pad to required length by duplicating data
-            sound = np.hstack((sound, sound[:(sample_count - sound.shape[0])]))
-        assert sound.shape[0] == sample_count
-
-        if self.audio_transform:
-            sound = self.audio_transform(samples=sound, sample_rate=conf.sample_rate)
-        assert sound.shape[0] == sample_count
         spec = librosa.feature.melspectrogram(
             y=sound, sr=conf.sample_rate, n_fft=conf.num_fft, hop_length=conf.hop_length,
             n_mels=conf.num_mels,  fmin=conf.min_freq, fmax=conf.max_freq)
@@ -81,7 +55,71 @@ class AudioDataset(data.Dataset):
             img, (conf.spectrogram_width, conf.num_mels),
             interpolation=cv2.INTER_AREA)
 
-        img = np.stack((img, img, img), axis=2)
+        return np.stack((img, img, img), axis=2)
+
+    def load_clip(self, filename, offset, duration):
+        assert os.path.isfile(filename)
+        sc = self.sample_count
+        sound, rate = librosa.load(
+            filename, sr=self.conf.sample_rate, offset=offset, duration=duration)
+        assert rate == self.conf.sample_rate
+        while (sound.shape[0] < sc):
+            # pad to required length by duplicating data
+            sound = np.hstack((sound, sound[:(sc - sound.shape[0])]))
+        return sound
+
+    def load_training_clip(self, index):
+        conf = self.conf
+        label = np.zeros(self.num_classes, dtype=np.float32)
+        if conf.audio_mixup_prob > random.random():
+            other = random.randint(max(0, index - 1000), index)
+            indices = [index, other]
+            w = random.uniform(0.1, 0.9)
+            weights = [w, 1 - w]
+        else:
+            indices = [index]
+            weights = [1.0]
+
+        clips = []
+        for i, idx in enumerate(indices):
+            filename = self.files[idx]
+            total_duration = librosa.get_duration(filename=filename)
+            if total_duration < conf.duration:
+                offset = 0
+            else:
+                offset = random.uniform(0, total_duration - conf.duration)
+            sound = self.load_clip(filename, offset, conf.duration)
+            sound *= weights[i]
+            clips.append(sound)
+            label += weights[i]*self.labels[idx]
+        if len(clips) > 1:
+            result = np.stack(clips).sum(axis=0)
+        else:
+            result = clips[0]
+
+        # apply label smoothing
+        label = np.abs(label - conf.label_smoothing)
+        return result, label
+
+    def __getitem__(self, index):
+        conf = self.conf
+        if self.is_test:
+            filename = self.files[index//12]
+            label = self.labels[index//12]
+            clip_idx = index%12
+            offset = clip_idx*5
+            sound = self.load_clip(filename, offset, 5)
+        elif self.is_val:
+            filename = self.files[index]
+            label = self.labels[index]
+            sound = self.load_clip(filename, 1, 5)
+        else:
+            sound, label = self.load_training_clip(index)
+
+        if self.audio_transform:
+            sound = self.audio_transform(samples=sound, sample_rate=conf.sample_rate)
+
+        img = self.get_spectrogram(sound)
         if self.image_transform:
             img = self.image_transform(image=img)['image']
         return img, label

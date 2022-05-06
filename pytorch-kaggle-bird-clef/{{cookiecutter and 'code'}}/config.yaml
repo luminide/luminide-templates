@@ -2,6 +2,7 @@
 arch: efficientnet_b3
 pretrained: true
 dropout_rate: 0.5
+label_smoothing: 0.0
 
 # resize spectrograms to this size on the fly
 spectrogram_width: {{ cookiecutter.spectrogram_width }}
@@ -19,16 +20,20 @@ gamma: 0.96
 image_aug_prob: 0.2
 audio_aug_prob: 0.2
 max_cutout: 10
+audio_mixup_prob: 0.2
 
-# audio duration in seconds
-duration: 5
-sample_rate: 32000
 min_freq: 500
 max_freq: 12500
 num_mels: 128
 num_fft: 1024
 hop_length: 512
 
+# static settings below - cannot be tuned with a sweep
+
+# audio duration in seconds
+duration: 5
+sample_rate: 32000
+
 # if the predicted probability is >= this value,
 # consider it positive
-prob_threshold: 0.2
+prob_threshold: 0.1
