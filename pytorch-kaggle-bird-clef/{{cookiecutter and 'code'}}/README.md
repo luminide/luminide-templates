@@ -33,17 +33,18 @@ If an item has multiple labels, they should be separated by a space character as
 - Accept [competition rules](https://www.kaggle.com/competitions/birdclef-2022/rules).
 - Attach a Compute Server that has a GPU (e.g. gcp-t4).
 - Configure your [Kaggle API token](https://github.com/Kaggle/kaggle-api) on the `Import Data` tab.
-- On the `Import Data` tab, choose Kaggle and then enter `birdclef-2022`.
-- Run [install.sh](install.sh) as a custom experiment to install required packages on the Compute Server.
+- On the `Import Data` tab, choose Kaggle Competition Data and then enter `birdclef-2022`.
+- Install required packages on the Compute Server using the Run Experiment menu (select `Custom > install.sh`).
 - Train a model using the `Run Experiment` menu.
 
 ### Kaggle submission
-- Run [kaggle.sh](kaggle.sh) as a custom experiment to upload the code to Kaggle as a dataset.
+- Upload the code to Kaggle as a dataset by using the Run Experiment menu (select `Custom > kaggle.sh`).
 - To create a submission, copy [kaggle.ipynb](kaggle.ipynb) to a new Kaggle notebook.
 - Add the notebook output of `https://www.kaggle.com/luminide/wheels1` as Data.
 - Add your dataset at `https://www.kaggle.com/<kaggle_username>/kagglecode` as Data.
 - Add the relevant competition dataset as Data.
-- Run the notebook after turning off the `Internet` setting.
+- Save the notebook after turning off the `Internet` setting and turning on the GPU.
+- Submit the results and wait for the notebook to finish.
 - Check the [leaderboard](https://www.kaggle.com/competitions/birdclef-2022/leaderboard) to see your score!
 
 ### Additional features
