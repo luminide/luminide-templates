@@ -68,6 +68,13 @@ class AudioDataset(data.Dataset):
             sound = np.hstack((sound, sound[:(sc - sound.shape[0])]))
         return sound
 
+    def snr(self, signal):
+        signal = signal - signal.min()
+        sd = signal.std()
+        if sd == 0:
+            return 0
+        return abs(signal.mean()/sd)
+
     def load_training_clip(self, index):
         conf = self.conf
         label = np.zeros(self.num_classes, dtype=np.float32)
@@ -89,6 +96,9 @@ class AudioDataset(data.Dataset):
             else:
                 offset = random.uniform(0, total_duration - conf.duration)
             sound = self.load_clip(filename, offset, conf.duration)
+            if conf.select_clips and self.snr(sound) < 4:
+                # fall back to the start of the clip
+                sound = self.load_clip(filename, 0, conf.duration)
             sound *= weights[i]
             clips.append(sound)
             label += weights[i]*self.labels[idx]
@@ -112,7 +122,7 @@ class AudioDataset(data.Dataset):
         elif self.is_val:
             filename = self.files[index]
             label = self.labels[index]
-            sound = self.load_clip(filename, 1, 5)
+            sound = self.load_clip(filename, 0, 5)
         else:
             sound, label = self.load_training_clip(index)
 
