@@ -11,7 +11,6 @@ import torch.utils.data as data
 from util import get_class_names, make_test_augmenters
 from dataset import AudioDataset
 from models import ModelWrapper
-from prep import prep_metadata
 from config import Config
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -25,8 +24,8 @@ def create_test_loader(conf, input_dir, class_names):
     data_files = sorted(glob(f'{input_dir}/{data_dir}/*.ogg'))
     assert len(data_files) > 0, f'No files inside {input_dir}/{data_dir}'
     data_files = [os.path.basename(filename) for filename in data_files]
-    test_df['files'] = data_files
-    test_df['labels'] = class_names[0]
+    test_df['{{ cookiecutter.file_column }}'] = data_files
+    test_df['{{ cookiecutter.label_column }}'] = class_names[0]
     test_dataset = AudioDataset(
         test_df, conf, input_dir, data_dir,
         class_names, test_audio_aug, test_image_aug, is_test=True)
@@ -72,7 +71,7 @@ def save_results(input_dir, df, preds, class_names):
     pred_idx = 0
     row_ids = []
     targets = []
-    for filename in df['files'].values:
+    for filename in df['{{ cookiecutter.file_column }}'].values:
         for clip_idx in range(12):
             end_time = 5*(clip_idx + 1)
             clip_preds = preds[pred_idx]
@@ -89,8 +88,7 @@ def save_results(input_dir, df, preds, class_names):
     print('Saved submission.csv')
 
 def run(input_dir, model_dir, threshold=0.3):
-    meta_file = 'train.csv'
-    prep_metadata(input_dir)
+    meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
     train_df = pd.read_csv(meta_file, dtype=str)
     class_names = np.array(get_class_names(train_df))
     num_classes = len(class_names)
