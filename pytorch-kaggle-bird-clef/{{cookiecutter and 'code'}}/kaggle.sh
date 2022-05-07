@@ -41,7 +41,7 @@ status=$(kaggle datasets status $dataset_name)
 [[ $status != "ready" ]]  && { echo "creating kaggle dataset..."; kaggle datasets create; }
 
 # copy source code
-for file in config.py dataset.py inference.py models.py prep.py util.py
+for file in config.py dataset.py inference.py models.py util.py
 do
     cp -v ../code/$file .
 done

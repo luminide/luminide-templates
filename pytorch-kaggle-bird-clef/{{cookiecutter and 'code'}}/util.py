@@ -43,7 +43,7 @@ class BCEFocalLoss(nn.Module):
         return loss.mean()
 
 def get_class_names(df):
-    labels = df['labels']
+    labels = df['{{ cookiecutter.label_column }}']
     return labels.unique()
 
 def search_layer(module, layer_type, reverse=True):

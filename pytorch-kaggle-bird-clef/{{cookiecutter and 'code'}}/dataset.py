@@ -24,12 +24,12 @@ class AudioDataset(data.Dataset):
             num_rows = df.shape[0]*subset//100
             df = df.iloc[:num_rows]
 
-        files = df['files']
+        files = df['{{ cookiecutter.file_column }}']
         assert isinstance(files[0], str), (
             f'column {df.columns[0]} must be of type str')
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
 
-        labels = df['labels']
+        labels = df['{{ cookiecutter.label_column }}']
         num_samples = len(files)
         self.num_classes = len(class_names)
         class_map = {class_names[i]: i for i in range(self.num_classes)}

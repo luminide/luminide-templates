@@ -22,7 +22,6 @@ from dataset import AudioDataset
 from models import ModelWrapper
 from config import Config
 from inference import predict_batch
-from prep import prep_metadata
 from util import LossHistory, BCEFocalLoss, get_class_names, make_test_augmenters
 
 
@@ -85,8 +84,8 @@ class Trainer:
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
-        prep_metadata(self.input_dir)
-        meta_file = 'train.csv'
+        meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
+        assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
         df = pd.read_csv(meta_file, dtype=str)
         class_names = get_class_names(df)
         print(f'{len(class_names)} classes: {class_names}')
@@ -128,7 +127,7 @@ class Trainer:
         return None
 
     def fit(self, epochs):
-        best_loss = None
+        best_score = None
         patience = self.max_patience
         self.sample_count = 0
         self.history = LossHistory()
@@ -155,8 +154,8 @@ class Trainer:
             print(f'training loss {train_loss:.5f}')
             print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
             self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
-            if best_loss is None or val_loss < best_loss:
-                best_loss = val_loss
+            if best_score is None or val_score > best_score:
+                best_score = val_score
                 state = {
                     'epoch': epoch, 'model': self.model.state_dict(),
                     'optimizer' : self.optimizer.state_dict(),
