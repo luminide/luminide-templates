@@ -60,10 +60,4 @@ If an item has multiple labels, they should be separated by a space character as
 ### Acknowledgements
 - The network architecture for the attention head is adapted from a [notebook by tattaka](https://www.kaggle.com/code/tattaka/birdclef2022-submission-baseline)
 
-{%- if cookiecutter.data_subset_percentage != '100' %}
-
-**Note**: As configured, the code trains on {{ cookiecutter.data_subset_percentage }}% of the data. To train on the entire dataset, edit `full.sh` and `fast.sh` to remove the `--subset` command line parameter so that the default value of 100 is used.
-{%- endif %}
-
-
 For more details on usage, see [Luminide documentation](https://luminide.readthedocs.io)

@@ -36,7 +36,7 @@ parser.add_argument(
     '-p', '--print-interval', default=100, type=int, metavar='N',
     help='print-interval in batches')
 parser.add_argument(
-    '--seed', default=0, type=int,
+    '--seed', default=None, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
@@ -44,9 +44,6 @@ parser.add_argument(
 parser.add_argument(
     '--validate', default='', type=str, metavar='PATH',
     help='path to saved model to validate')
-parser.add_argument(
-    '-s', '--subset', default=100, type=int, metavar='N',
-    help='use a percentage of the data for training and validation')
 parser.add_argument(
     '--input', default='../input', metavar='DIR',
     help='input directory')
@@ -57,7 +54,7 @@ device = torch.device(device_type)
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval=100, subset=100):
+            checkpoint, print_interval=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
@@ -69,7 +66,7 @@ class Trainer:
             self.scaler = GradScaler()
 {%- endif %}
 
-        self.create_dataloaders(num_workers, subset)
+        self.create_dataloaders(num_workers)
 
         self.model = ModelWrapper(conf, self.num_classes)
         self.model = self.model.to(device)
@@ -82,7 +79,7 @@ class Trainer:
             self.optimizer, gamma=conf.gamma)
         self.history = None
 
-    def create_dataloaders(self, num_workers, subset):
+    def create_dataloaders(self, num_workers):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
@@ -102,10 +99,10 @@ class Trainer:
         val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = AudioDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_audio_dir }}',
-            class_names, train_audio_aug, train_image_aug, subset)
+            class_names, train_audio_aug, train_image_aug)
         val_dataset = AudioDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_audio_dir }}',
-            class_names, test_audio_aug, test_image_aug, subset, is_val=True)
+            class_names, test_audio_aug, test_image_aug, is_val=True)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
@@ -244,7 +241,6 @@ class Trainer:
 
     def validate(self):
         loss_func = BCEFocalLoss()
-        sigmoid = nn.Sigmoid()
         losses = []
         all_labels = np.zeros(
             (len(self.val_loader.dataset), self.num_classes), dtype=np.float32)
@@ -281,8 +277,6 @@ def worker_init_fn(worker_id):
 
 def main():
     args = parser.parse_args()
-    if args.subset != 100:
-        print(f'\nWARNING: {args.subset}% of the data will be used for training\n')
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -300,7 +294,7 @@ def main():
     print(conf)
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
-        checkpoint, args.print_interval, args.subset)
+        checkpoint, args.print_interval)
     if args.validate:
         loss, score = trainer.validate()
         print(f'Validation loss {loss:.4} score {score:.4}')

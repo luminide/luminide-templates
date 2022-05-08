@@ -11,18 +11,12 @@ warnings.simplefilter("ignore")
 class AudioDataset(data.Dataset):
     def __init__(
             self, df, conf, input_dir, imgs_dir,
-            class_names, audio_transform, image_transform, subset=100, is_val=False, is_test=False):
+            class_names, audio_transform, image_transform, is_val=False, is_test=False):
         self.conf = conf
         self.audio_transform = audio_transform
         self.image_transform = image_transform
         self.is_test = is_test
         self.is_val = is_val
-
-        if subset != 100:
-            assert subset < 100
-            # train and validate on subsets
-            num_rows = df.shape[0]*subset//100
-            df = df.iloc[:num_rows]
 
         files = df['{{ cookiecutter.file_column }}']
         assert isinstance(files[0], str), (
@@ -74,46 +68,16 @@ class AudioDataset(data.Dataset):
             sound = np.hstack((sound, sound[:(sc - sound.shape[0])]))
         return sound
 
-    def snr(self, signal):
-        signal = signal - signal.min()
-        sd = signal.std()
-        if sd == 0:
-            return 0
-        return abs(signal.mean()/sd)
-
     def load_training_clip(self, index):
         conf = self.conf
-        label = np.zeros(self.num_classes, dtype=np.float32)
-        if conf.audio_mixup_prob > random.random():
-            # mix this clip with another randomly selected clip
-            other = random.randint(max(0, index - 1000), index)
-            indices = [index, other]
-            w = random.uniform(0.1, 0.9)
-            weights = [w, 1 - w]
+        label = self.labels[index]
+        filename = self.files[index]
+        total_duration = librosa.get_duration(filename=filename)
+        if total_duration < conf.duration:
+            offset = 0
         else:
-            indices = [index]
-            weights = [1.0]
-
-        clips = []
-        for i, idx in enumerate(indices):
-            filename = self.files[idx]
-            total_duration = librosa.get_duration(filename=filename)
-            if total_duration < conf.duration:
-                offset = 0
-            else:
-                offset = random.uniform(0, total_duration - conf.duration)
-            sound = self.load_clip(filename, offset, conf.duration)
-            if conf.select_clips and self.snr(sound) < 4:
-                # fall back to the start of the clip
-                sound = self.load_clip(filename, 0, conf.duration)
-            sound *= weights[i]
-            clips.append(sound)
-            label += weights[i]*self.labels[idx]
-        if len(clips) > 1:
-            result = np.stack(clips).sum(axis=0)
-        else:
-            result = clips[0]
-
+            offset = random.uniform(0, total_duration - conf.duration)
+        result = self.load_clip(filename, offset, conf.duration)
         # apply label smoothing
         label = np.abs(label - conf.label_smoothing)
         return result, label
