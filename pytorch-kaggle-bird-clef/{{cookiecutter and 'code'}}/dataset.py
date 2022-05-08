@@ -33,7 +33,13 @@ class AudioDataset(data.Dataset):
         num_samples = len(files)
         self.num_classes = len(class_names)
         class_map = {class_names[i]: i for i in range(self.num_classes)}
-        self.sample_count =  conf.duration*conf.sample_rate
+        if is_test or is_val:
+            self.sample_count =  5*conf.sample_rate
+            self.spectrogram_width = conf.spectrogram_width
+        else:
+            self.sample_count =  conf.duration*conf.sample_rate
+            assert conf.duration%5 == 0
+            self.spectrogram_width = conf.spectrogram_width*conf.duration//5
         self.labels = np.zeros((num_samples, self.num_classes), dtype=np.float32)
         for i in range(num_samples):
             row_labels = [class_map[token] for token in labels[i].split(' ')]
@@ -52,7 +58,7 @@ class AudioDataset(data.Dataset):
         img *= 255
         img = img.round().astype(np.uint8)
         img = cv2.resize(
-            img, (conf.spectrogram_width, conf.num_mels),
+            img, (self.spectrogram_width, conf.num_mels),
             interpolation=cv2.INTER_AREA)
 
         return np.stack((img, img, img), axis=2)
@@ -79,6 +85,7 @@ class AudioDataset(data.Dataset):
         conf = self.conf
         label = np.zeros(self.num_classes, dtype=np.float32)
         if conf.audio_mixup_prob > random.random():
+            # mix this clip with another randomly selected clip
             other = random.randint(max(0, index - 1000), index)
             indices = [index, other]
             w = random.uniform(0.1, 0.9)
