@@ -88,7 +88,7 @@ class Trainer:
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
         df = pd.read_csv(meta_file, dtype=str)
         class_names = get_class_names(df)
-        print(f'{len(class_names)} classes: {class_names}')
+        print(f'{len(class_names)} classes')
         self.num_classes = len(class_names)
 
         # shuffle

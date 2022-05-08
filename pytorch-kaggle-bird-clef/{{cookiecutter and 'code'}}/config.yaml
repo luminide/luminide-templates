@@ -4,14 +4,21 @@ pretrained: true
 dropout_rate: 0.5
 label_smoothing: 0.01
 
-# resize spectrograms to this size on the fly
+# training clip duration in seconds
+duration: 5
+# resize 5 second spectrograms to this width on the fly
 spectrogram_width: {{ cookiecutter.spectrogram_width }}
+# try to filter out noise clips while training
+select_clips: false
+# if the predicted probability is >= this value,
+# consider it positive (only applies to validation)
+prob_threshold: 0.2
 
 # optimizer settings
 optim: adam
 lr: 0.001
 weight_decay: 0.01
-batch_size: 128
+batch_size: 64
 
 # scheduler settings
 gamma: 0.96
@@ -27,15 +34,4 @@ max_freq: 12500
 num_mels: 128
 num_fft: 1024
 hop_length: 512
-
-# static settings below - cannot be tuned with a sweep
-
-# audio duration in seconds
-duration: 5
 sample_rate: 32000
-
-# if the predicted probability is >= this value,
-# consider it positive
-prob_threshold: 0.2
-# try to filter out noise clips while training
-select_clips: false

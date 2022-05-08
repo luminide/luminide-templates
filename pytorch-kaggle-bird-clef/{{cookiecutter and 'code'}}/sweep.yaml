@@ -23,7 +23,7 @@ parameters:
   num_mels:
     distribution: q_uniform
     min: 64
-    max: 128
+    max: 196
     q: 64
   hop_length:
     distribution: q_uniform
