@@ -13,8 +13,8 @@ parameters:
     q: 0.01
   lr:
     distribution: log_uniform
-    min: 0.01
-    max: 0.1
+    min: 0.0005
+    max: 0.01
   weight_decay:
     distribution: q_uniform
     min: 0.0
@@ -23,22 +23,18 @@ parameters:
   num_mels:
     distribution: q_uniform
     min: 64
-    max: 196
+    max: 192
     q: 64
-  hop_length:
+  spectrogram_width:
     distribution: q_uniform
-    min: 256
-    max: 512
-    q: 256
+    min: 128
+    max: 256
+    q: 128
   image_aug_prob:
     distribution: uniform
-    min: 0.2
+    min: 0.0
     max: 0.8
   audio_aug_prob:
     distribution: uniform
-    min: 0.2
-    max: 0.4
-  audio_mixup_prob:
-    distribution: uniform
     min: 0.0
-    max: 0.5
+    max: 0.4

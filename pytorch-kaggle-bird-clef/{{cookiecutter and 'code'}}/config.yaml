@@ -1,5 +1,5 @@
 # this can be any network from the timm library
-arch: efficientnet_b3
+arch: resnet50
 pretrained: true
 dropout_rate: 0.5
 label_smoothing: 0.01
@@ -7,9 +7,7 @@ label_smoothing: 0.01
 # training clip duration in seconds
 duration: 5
 # resize 5 second spectrograms to this width on the fly
-spectrogram_width: {{ cookiecutter.spectrogram_width }}
-# try to filter out noise clips while training
-select_clips: false
+spectrogram_width: 128
 # if the predicted probability is >= this value,
 # consider it positive (only applies to validation)
 prob_threshold: 0.2
@@ -27,7 +25,6 @@ gamma: 0.96
 image_aug_prob: 0.2
 audio_aug_prob: 0.2
 max_cutout: 10
-audio_mixup_prob: 0.0
 
 min_freq: 500
 max_freq: 12500
