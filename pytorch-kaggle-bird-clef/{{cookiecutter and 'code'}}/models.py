@@ -21,7 +21,7 @@ class GeMFreq(nn.Module):
 
 class AttHead(nn.Module):
     def __init__(
-            self, in_chans, num_classes, p=0.5, train_period=15.0, infer_period=5.0):
+            self, conf, in_chans, num_classes, p=0.5, train_period=15.0, infer_period=5.0):
         super().__init__()
         self.train_period = train_period
         self.infer_period = infer_period
@@ -29,15 +29,15 @@ class AttHead(nn.Module):
 
         self.dense_layers = nn.Sequential(
             nn.Dropout(p / 2),
-            nn.Linear(in_chans, 512),
+            nn.Linear(in_chans, conf.attn_length),
             nn.ReLU(),
             nn.Dropout(p),
         )
         self.attention = nn.Conv1d(
-            in_channels=512, out_channels=num_classes, kernel_size=1, stride=1,
+            in_channels=conf.attn_length, out_channels=num_classes, kernel_size=1, stride=1,
             padding=0, bias=True)
         self.fix_scale = nn.Conv1d(
-            in_channels=512, out_channels=num_classes, kernel_size=1, stride=1,
+            in_channels=conf.attn_length, out_channels=num_classes, kernel_size=1, stride=1,
             padding=0, bias=True)
 
     def forward(self, x):
@@ -59,7 +59,7 @@ class ModelWrapper(nn.Module):
             drop_rate=conf.dropout_rate, features_only=True)
         encoder_channels = self.backbone.feature_info.channels()
         self.head = AttHead(
-            encoder_channels[-1], num_classes, p=0.5,
+            conf, encoder_channels[-1], num_classes, p=0.5,
             train_period=conf.duration, infer_period=conf.duration)
 
     def forward(self, x):
