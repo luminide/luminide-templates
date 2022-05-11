@@ -25,6 +25,7 @@ gamma: 0.96
 # data augmentation
 image_aug_prob: 0.2
 audio_aug_prob: 0.2
+audio_mixup_prob: 0.0
 max_cutout: 10
 
 min_freq: 500

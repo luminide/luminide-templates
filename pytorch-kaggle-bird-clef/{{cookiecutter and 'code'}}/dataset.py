@@ -68,6 +68,25 @@ class AudioDataset(data.Dataset):
             sound = np.hstack((sound, sound[:(sc - sound.shape[0])]))
         return sound
 
+    def audio_mixup(self, index, clip, label):
+        # mix the given clip with another randomly selected clip
+        conf = self.conf
+        other_index = random.randint(max(0, index - 1000), index)
+        w = random.uniform(0.1, 0.9)
+
+        filename = self.files[other_index]
+        other_label = self.labels[other_index]
+        total_duration = librosa.get_duration(filename=filename)
+        if total_duration < conf.duration:
+            offset = 0
+        else:
+            offset = random.uniform(0, total_duration - conf.duration)
+        other_clip = self.load_clip(filename, offset, conf.duration)
+
+        result =  w*clip + (1 - w)*other_clip
+        label = w*label + (1 - w)*other_label
+        return result, label
+
     def load_training_clip(self, index):
         conf = self.conf
         label = self.labels[index]
@@ -78,6 +97,8 @@ class AudioDataset(data.Dataset):
         else:
             offset = random.uniform(0, total_duration - conf.duration)
         result = self.load_clip(filename, offset, conf.duration)
+        if conf.audio_mixup_prob > random.random():
+            result, label = self.audio_mixup(index, result, label)
         # apply label smoothing
         label = np.abs(label - conf.label_smoothing)
         return result, label
