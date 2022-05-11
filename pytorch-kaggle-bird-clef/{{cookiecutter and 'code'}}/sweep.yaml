@@ -38,3 +38,12 @@ parameters:
     distribution: uniform
     min: 0.0
     max: 0.4
+  audio_mixup_prob:
+    distribution: uniform
+    min: 0.0
+    max: 0.4
+  attn_length:
+    distribution: q_uniform
+    min: 256
+    max: 512
+    q: 256
