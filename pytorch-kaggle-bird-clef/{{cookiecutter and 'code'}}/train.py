@@ -151,16 +151,17 @@ class Trainer:
             print(f'training loss {train_loss:.5f}')
             print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
             self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
+            state = {
+                'epoch': epoch, 'model': self.model.state_dict(),
+                'optimizer' : self.optimizer.state_dict(),
+                'conf': self.conf.as_dict()
+            }
             if best_score is None or val_score > best_score:
                 best_score = val_score
-                state = {
-                    'epoch': epoch, 'model': self.model.state_dict(),
-                    'optimizer' : self.optimizer.state_dict(),
-                    'conf': self.conf.as_dict()
-                }
                 torch.save(state, 'model.pth')
                 patience = self.max_patience
             else:
+                torch.save(state, 'last.pth')
                 patience -= 1
                 if patience == 0:
                     print(
