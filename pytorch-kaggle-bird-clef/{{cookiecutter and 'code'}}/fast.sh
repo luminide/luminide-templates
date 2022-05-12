@@ -4,4 +4,4 @@
 #
 
 pip3 install -q -r ../code/requirements.txt
-python3 ../code/train.py --epochs 5
+python3 ../code/train.py --epochs 6

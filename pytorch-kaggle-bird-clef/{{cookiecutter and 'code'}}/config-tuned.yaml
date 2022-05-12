@@ -15,7 +15,7 @@ prob_threshold: 0.2
 
 # optimizer settings
 optim: adam
-lr: 0.001
+lr: 0.0005
 weight_decay: 0.005
 batch_size: 64
 
@@ -30,7 +30,7 @@ max_cutout: 10
 
 min_freq: 500
 max_freq: 12500
-num_mels: 128
+num_mels: 192
 num_fft: 1024
 hop_length: 512
 sample_rate: 32000
