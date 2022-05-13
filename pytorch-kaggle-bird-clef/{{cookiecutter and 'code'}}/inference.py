@@ -35,8 +35,8 @@ def create_test_loader(conf, input_dir, class_names):
         num_workers=mp.cpu_count(), pin_memory=False)
     return loader, test_df
 
-def create_model(model_dir, num_classes):
-    checkpoint = torch.load(f'{model_dir}/model.pth', map_location=device)
+def create_model(model_dir, model_file, num_classes):
+    checkpoint = torch.load(f'{model_dir}/{model_file}', map_location=device)
     conf = Config(checkpoint['conf'])
     conf.pretrained = False
     model = ModelWrapper(conf, num_classes)
@@ -50,7 +50,8 @@ def predict_batch(outputs, threshold):
     # set prediction to 1 if probability >= threshold
     return sigmoid(outputs).cpu().numpy() >= threshold
 
-def test(loader, model, num_classes, threshold):
+def test(loader, model, num_classes):
+    sigmoid = nn.Sigmoid()
     preds = np.zeros((len(loader.dataset), num_classes), dtype=np.float32)
     start_idx = 0
     model.eval()
@@ -59,11 +60,11 @@ def test(loader, model, num_classes, threshold):
             inputs = inputs.to(device)
             outputs = model(inputs)
             end_idx = start_idx + outputs.shape[0]
-            preds[start_idx:end_idx] = predict_batch(outputs, threshold)
+            preds[start_idx:end_idx] = sigmoid(outputs).cpu().numpy()
             start_idx = end_idx
     return preds
 
-def save_results(input_dir, df, preds, class_names):
+def save_results(input_dir, df, preds, class_names, threshold):
     class_map = {name: i for i, name in enumerate(class_names)}
     with open(f'{input_dir}/scored_birds.json') as json_file:
         birds = json.load(json_file)
@@ -78,7 +79,7 @@ def save_results(input_dir, df, preds, class_names):
             pred_idx += 1
             for bird in birds:
                 key = f'{filename[:-4]}_{bird}_{end_time}'
-                pred = clip_preds[class_map[bird]] > 0
+                pred = clip_preds[class_map[bird]] > threshold
                 row_ids.append(key)
                 targets.append(pred)
     subm = pd.DataFrame()
@@ -87,18 +88,20 @@ def save_results(input_dir, df, preds, class_names):
     subm.to_csv('submission.csv', index=False)
     print('Saved submission.csv')
 
-def run(input_dir, model_dir, threshold=0.3):
+def run(input_dir, model_dir, model_files, threshold):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
     train_df = pd.read_csv(meta_file, dtype=str)
     class_names = np.array(get_class_names(train_df))
     num_classes = len(class_names)
-
-    model, conf = create_model(model_dir, num_classes)
-    loader, df = create_test_loader(conf, input_dir, class_names)
-    assert len(loader.dataset) == 12*df.shape[0]
-    preds = test(loader, model, num_classes, threshold)
-    save_results(input_dir, df, preds, class_names)
+    preds = []
+    for model_file in model_files:
+        model, conf = create_model(model_dir, model_file, num_classes)
+        loader, df = create_test_loader(conf, input_dir, class_names)
+        assert len(loader.dataset) == 12*df.shape[0]
+        preds.append(test(loader, model, num_classes))
+    final_preds = np.stack(preds).mean(axis=0)
+    save_results(input_dir, df, final_preds, class_names, threshold)
 
 if __name__ == '__main__':
-    run('../input', './')
-
+    test_threshold = 0.03
+    run('../input', './', ['model.pth', 'last.pth'], test_threshold)
