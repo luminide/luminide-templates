@@ -39,23 +39,28 @@ class AudioDataset(data.Dataset):
             row_labels = [class_map[token] for token in labels[i].split(' ')]
             self.labels[i, row_labels] = 1.0
 
-    def get_spectrogram(self, sound):
-        conf = self.conf
-        spec = librosa.feature.melspectrogram(
-            y=sound, sr=conf.sample_rate, n_fft=conf.num_fft, hop_length=conf.hop_length,
-            n_mels=conf.num_mels,  fmin=conf.min_freq, fmax=conf.max_freq)
-        img = librosa.power_to_db(spec, ref=np.max)
+    def normalize(self, img):
         img -= img.min()
         max_val = img.max()
         if max_val != 0:
             img /= max_val
+        return img
+
+    def get_spectrogram(self, sound):
+        conf = self.conf
+        channels = []
+        for window in ['hann', 'blackman', 'hamming']:
+            spec = librosa.feature.melspectrogram(
+                y=sound, sr=conf.sample_rate, n_fft=conf.num_fft, hop_length=conf.hop_length,
+                window=window, n_mels=conf.num_mels,  fmin=conf.min_freq, fmax=conf.max_freq)
+            channels.append(self.normalize(librosa.power_to_db(spec, ref=np.max)))
+        img = np.stack(channels, axis=2)
         img *= 255
         img = img.round().astype(np.uint8)
         img = cv2.resize(
             img, (self.spectrogram_width, conf.num_mels),
             interpolation=cv2.INTER_AREA)
-
-        return np.stack((img, img, img), axis=2)
+        return img
 
     def load_clip(self, filename, offset, duration):
         assert os.path.isfile(filename)
