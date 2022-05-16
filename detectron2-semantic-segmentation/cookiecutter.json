@@ -7,5 +7,5 @@
     "annotation_column": "segmentation",
     "label_column": "class",
     "augmentation": ["True", "False"],
-    "Kaggle": ["False", "True"]
+    "Kaggle": ["True", "False"]
 }

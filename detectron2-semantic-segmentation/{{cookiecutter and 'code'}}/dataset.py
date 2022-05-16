@@ -9,7 +9,6 @@ import itertools
 import multiprocessing as mp
 import functools
 from detectron2.structures import BoxMode
-from detectron2.structures import polygons_to_bitmask
 
 from util import get_class_names
 
@@ -49,23 +48,27 @@ def split_data(file_list):
     val_list = file_list[split:]
     return train_list, val_list
 
+def get_id(filename):
+    tokens = filename.split('/')
+    return tokens[4] + '_' + '_'.join(tokens[-1].split('_')[0:2])
+
 def get_record(meta_df, category_ids, filename):
-    print(filename)
+    img_id = get_id(filename)
+    annos = meta_df[meta_df['{{ cookiecutter.image_column }}'] == img_id]
+
     record = {}
     height, width = cv2.imread(filename).shape[:2]
-    filename = filename.split('/')[-1]
-    img_id = filename[:-4]
-
-    record['file_name'] = filename
+    record['file_name'] = '/'.join(filename.split('/')[3:])
     record['image_id'] = img_id
     record['height'] = height
     record['width'] = width
-    annos = meta_df[meta_df['{{ cookiecutter.image_column }}'] == img_id]
 
     objs = []
     for anno_id, row in annos.iterrows():
         anno = row['{{ cookiecutter.annotation_column }}']
-        mask = rle_decode(anno, (row['height'], row['width']))
+        if pd.isnull(anno):
+            continue
+        mask = rle_decode(anno, (height, width))
         ys, xs = np.where(mask)
         x1, x2 = min(xs), max(xs)
         y1, y2 = min(ys), max(ys)
@@ -93,18 +96,23 @@ def get_dataset_dicts(input_dir, set_name, img_dir, meta_file):
         return dataset_dicts
 
     print('preparing dataset dicts...')
-    all_img_files = sorted(glob.glob(f'{img_dir}/*.{{ cookiecutter.file_extension }}'))
+    all_img_files = []
+    subdir = ''
+    while len(all_img_files) == 0:
+        all_img_files = sorted(glob.glob(f'{img_dir}/{subdir}*.{{ cookiecutter.file_extension }}'))
+        subdir += '*/'
     train_files, val_files = split_data(all_img_files)
     img_files = val_files if set_name == 'val' else train_files
     print(f'{set_name}: {len(img_files)} samples')
     meta_df = pd.read_csv(meta_file)
     category_names = get_class_names(meta_df)
     category_ids = {name: ident for ident, name in enumerate(category_names, 1)}
-
     pool = mp.Pool(processes=mp.cpu_count())
     rec_func = functools.partial(get_record, meta_df, category_ids)
     dataset_dicts = pool.map(rec_func, img_files)
     pool.close()
+    # filter Nones
+    dataset_dicts = [d for d in dataset_dicts if d]
 
     print(f'loaded metadata for {set_name}. {len(dataset_dicts)} records')
     with open(datadicts_json, 'w') as fd:

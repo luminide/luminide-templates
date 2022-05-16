@@ -23,8 +23,8 @@
     "    print(f'Run this on Kaggle after adding the notebook output of {notebook_url} as Data')\n",
     "    sys.exit()\n",
     "\n",
-    "if not os.path.exists('../input/kagglecode'):\n",
-    "    dataset_url = 'https://www.kaggle.com/<kaggle_username>/kagglecode'\n",
+    "if not os.path.exists('../input/kagglecode1'):\n",
+    "    dataset_url = 'https://www.kaggle.com/<kaggle_username>/kagglecode1'\n",
     "    print(f'Your dataset at {dataset_url} should be added as Data')\n",
     "    sys.exit()\n",
     "\n",
@@ -45,7 +45,7 @@
     "!pip install -q --no-index --find-links ../input/wheels2 ../input/wheels2/torchvision-0.11.1+cu113-cp37-cp37m-linux_x86_64.whl\n",
     "!pip install -q --no-index --find-links ../input/wheels2 ../input/wheels2/detectron2-0.6+cu113-cp37-cp37m-linux_x86_64.whl\n",
     "\n",
-    "sys.path.append('../input/kagglecode')\n",
+    "sys.path.append('../input/kagglecode1')\n",
     "from inference import run\n",
     "\n",
     "train_csv_paths = glob('../input/*/train.csv')\n",
@@ -56,7 +56,7 @@
     "input_dir = os.path.dirname(train_csv_paths[0])\n",
     "\n",
     "print('Running inference...')\n",
-    "run(input_dir, '../input/kagglecode')"
+    "run(input_dir, '../input/kagglecode1')"
    ]
   },
   {

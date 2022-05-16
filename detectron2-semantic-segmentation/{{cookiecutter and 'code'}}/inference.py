@@ -11,6 +11,9 @@ from detectron2.engine import DefaultPredictor
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.modeling import build_model
 
+from util import get_class_names
+from dataset import get_id
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -34,25 +37,29 @@ def rle_encode(img):
     runs[1::2] -= runs[::2]
     return ' '.join(str(x) for x in runs)
 
-def get_masks(pred):
+def get_mask(pred, class_id):
+    # aggregate instances of the given class
     instances = pred['instances']
-    pred_class = torch.mode(instances.pred_classes)[0].item() + 1
-    pred_masks = instances.pred_masks.cpu().numpy()
+    if len(instances) == 0:
+        return None
 
-    res = []
-    used = np.zeros(instances.image_size, dtype=int)
-    # filter out overlaps
-    for mask in pred_masks:
-        mask = mask*(1 - used)
-        if mask.sum() <= 0:
-            continue
-        used += mask
-        res.append(rle_encode(mask))
-    return res, pred_class
+    result = np.zeros(instances.image_size, dtype=np.uint8)
+    found = False
+    for idx in range(len(instances)):
+        instance = instances[idx]
+        if instance.pred_classes == class_id:
+            found = True
+            result += instance.pred_masks.cpu().numpy().squeeze()
+
+    result[result > 1] = 1
+    if found:
+        return result
+    return None
 
 def run(input_dir, model_dir):
     meta_file = f'{input_dir}/{{ cookiecutter.train_metadata }}'
     meta_df = pd.read_csv(meta_file)
+    class_names = get_class_names(meta_df)
 
     cfg = CN.load_cfg(open(f'{model_dir}/cfg.yaml'))
     print('processing test set...')
@@ -64,20 +71,32 @@ def run(input_dir, model_dir):
     DetectionCheckpointer(model).load(model_file)
 
     predictor = DefaultPredictor(cfg)
-    test_names = sorted(glob.glob(f'{input_dir}/test/*.{{ cookiecutter.file_extension }}'))
+    test_names = []
+    subdir = ''
+    while len(test_names) == 0 and len(subdir) < 10:
+        test_names = sorted(glob.glob(f'{input_dir}/test/{subdir}*.{{ cookiecutter.file_extension }}'))
+        subdir += '*/'
+    subm = pd.read_csv(f'{input_dir}/sample_submission.csv')
+    del subm['predicted']
     ids = []
+    classes = []
     masks = []
     for img_file in test_names:
         img_data = cv2.imread(img_file)
         pred = predictor(img_data)
-        img_masks, pred_class = get_masks(pred)
-        img_id = img_file.split('/')[-1][:-4]
-        ids.extend([img_id]*len(img_masks))
-        masks.extend(img_masks)
+        img_id = get_id(img_file)
+        for class_id, class_name in enumerate(class_names):
+            img_mask = get_mask(pred, class_id)
+            enc_mask = '' if img_mask is None else rle_encode(img_mask)
+            ids.append(img_id)
+            classes.append(class_name)
+            masks.append(enc_mask)
 
-    assert len(ids) == len(masks)
-    pd.DataFrame({'id': ids, 'predicted': masks}).to_csv('submission.csv', index=False)
-    print(pd.read_csv('submission.csv').head())
+    pred_df = pd.DataFrame({'id': ids, 'class': classes, 'predicted': masks})
+    if pred_df.shape[0] > 0:
+        # sort according to the given order and save to a csv file
+        subm = subm.merge(pred_df, on=['id', 'class'])
+    subm.to_csv('submission.csv', index=False)
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ from detectron2.config import CfgNode as CN
 from detectron2.data import DatasetCatalog
 from detectron2.data.datasets import register_coco_instances
 
-from evaluator import MAPIOUEvaluator
+from evaluator import DiceEvaluator
 from util import LossHistory, get_class_names
 from augment import build_train_augmentation
 from config import Config
@@ -107,7 +107,7 @@ class ValidationLossHook(HookBase):
 class Trainer(DefaultTrainer):
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        return MAPIOUEvaluator(dataset_name)
+        return DiceEvaluator(dataset_name)
 
     @classmethod
     def build_train_loader(cls, cfg, sampler=None):
@@ -143,11 +143,15 @@ def main():
     train_len = len(DatasetCatalog.get(train_set))
     cfg_name = conf.arch
     cfg = get_cfg()
+    cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
     cfg.INPUT.MASK_FORMAT = 'bitmask'
+    cfg.INPUT.MIN_SIZE_TRAIN = (conf.min_size, conf.min_size + 16, conf.min_size + 32)
+    cfg.INPUT.MAX_SIZE_TRAIN = conf.max_size
+    cfg.INPUT.MIN_SIZE_TEST = conf.min_size
+    cfg.INPUT.MAX_SIZE_TEST = conf.max_size
     cfg.INPUT.CROP = CN({"ENABLED": True})
     cfg.INPUT.CROP.TYPE = "relative_range"
     cfg.INPUT.CROP.SIZE = [conf.crop_size, conf.crop_size]
-    cfg.merge_from_file(model_zoo.get_config_file(cfg_name))
     cfg.DATASETS.TRAIN = (train_set,)
     cfg.DATASETS.TEST = ('val',)
     cfg.DATALOADER.NUM_WORKERS = args.num_workers
@@ -178,7 +182,7 @@ def main():
     cfg.MODEL.RPN.BBOX_REG_LOSS_TYPE =  conf.loss_type
     # validate after every epoch
     cfg.TEST.EVAL_PERIOD = batch_count
-    cfg.TEST.DETECTIONS_PER_IMAGE = 1000
+    cfg.TEST.DETECTIONS_PER_IMAGE = 100
     # disable periodic checkpointing
     cfg.SOLVER.CHECKPOINT_PERIOD = cfg.SOLVER.MAX_ITER + 1
     cfg.SOLVER.AMP = CN({"ENABLED": True})
