@@ -1,12 +1,12 @@
 {
-    "project_description": "Image classification",
+    "project_description": "Semantic segmentation",
     "train_metadata": "train.csv",
-    "train_image_dir": "train_images",
-    "image_column": "image",
-    "label_column": "labels",
-    "image_size": 64,
-    "data_subset_percentage": 50,
-    "augmentation": ["True", "False"],
+    "train_image_dir": "train",
+    "file_extension": "png",
+    "image_column": "id",
+    "label_column": "class",
+    "annotation_column": "segmentation",
+    "data_subset_percentage": 100,
     "AMP": ["True", "False"],
-    "Kaggle": ["False", "True"]
+    "Kaggle": ["True", "False"]
 }

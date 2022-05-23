@@ -2,13 +2,12 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
 
-{% if cookiecutter.augmentation == "True" -%}
 def make_train_augmenter(conf):
     p = conf.aug_prob
     if p <= 0:
         return A.Compose([
-            A.Normalize(),
-            ToTensorV2()
+            A.Normalize(max_pixel_value=1.0),
+            ToTensorV2(transpose_mask=True)
         ])
 
     crop_size = round(conf.image_size*conf.crop_size)
@@ -18,7 +17,7 @@ def make_train_augmenter(conf):
             A.CoarseDropout(
                 max_holes=conf.max_cutout, min_holes=1,
                 max_height=crop_size//10, max_width=crop_size//10,
-                min_height=4, min_width=4, p=0.2*p),
+                min_height=4, min_width=4, mask_fill_value=0, p=0.2*p),
         ])
 
     aug_list.extend([
@@ -26,7 +25,7 @@ def make_train_augmenter(conf):
             shift_limit=0.0625, scale_limit=0.2, rotate_limit=25,
             interpolation=cv2.INTER_AREA, p=p),
         A.RandomCrop(height=crop_size, width=crop_size, always_apply=True),
-        A.Flip(p=0.5*p),
+        A.HorizontalFlip(p=0.5*p),
         A.OneOf([
             A.MotionBlur(p=0.2*p),
             A.MedianBlur(blur_limit=3, p=0.1*p),
@@ -53,19 +52,8 @@ def make_train_augmenter(conf):
         ])
 
     aug_list.extend([
-        A.Normalize(),
-        ToTensorV2()
+        A.Normalize(max_pixel_value=1.0),
+        ToTensorV2(transpose_mask=True)
     ])
 
     return A.Compose(aug_list)
-
-{% elif cookiecutter.augmentation == "False" -%}
-def make_train_augmenter(conf):
-    aug_list = [
-        A.Normalize(),
-        ToTensorV2()
-    ]
-
-    return A.Compose(aug_list)
-
-{%- endif %}

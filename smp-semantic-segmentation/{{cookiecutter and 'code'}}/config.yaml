@@ -1,15 +1,15 @@
 # this can be any network from the timm library
-arch: resnet18
+arch: efficientnet-b3
 pretrained: true
 dropout_rate: 0.5
 
 # resize images to this size on the fly
-image_size: {{ cookiecutter.image_size }}
+image_size: 320
 # crop to this fraction of image_size
 crop_size: 0.8
 
 # optimizer settings
-optim: sgd
+optim: adam
 lr: 0.001
 weight_decay: 0.01
 batch_size: 32
@@ -17,11 +17,7 @@ batch_size: 32
 # scheduler settings
 gamma: 0.96
 
-{%- if cookiecutter.augmentation == "True" %}
-
 # data augmentation
 aug_prob: 0.1
 strong_aug: false
 max_cutout: 0
-
-{%- endif %}
