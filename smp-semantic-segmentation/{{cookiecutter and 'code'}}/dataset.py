@@ -17,38 +17,37 @@ class VisionDataset(data.Dataset):
             num_rows = df.shape[0]*subset//100
             df = df.iloc[:num_rows]
 
-        files = df['{{ cookiecutter.image_column }}']
-        assert isinstance(files[0], str), (
-            f'column {df.columns[0]} must be of type str')
+        files = df['img_files']
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
+        self.masks = [os.path.join('../masks', f) for f in files]
 
-        labels = df['{{ cookiecutter.label_column }}']
-        num_samples = len(files)
-        num_classes = len(class_names)
-        class_map = {class_names[i]: i for i in range(num_classes)}
-        self.labels = np.zeros((num_samples, num_classes), dtype=np.float32)
-        for i in range(num_samples):
-            row_labels = [class_map[token] for token in labels[i].split(' ')]
-            self.labels[i, row_labels] = 1.0
+    def resize(self, img):
+        return  cv2.resize(
+            img, (self.conf.image_size, self.conf.image_size),
+            interpolation=cv2.INTER_AREA)
 
     def __getitem__(self, index):
         conf = self.conf
-        filename = self.files[index]
-        assert os.path.isfile(filename)
-        img = cv2.imread(filename)
-{%- if cookiecutter.augmentation == "True" %}
-        img = cv2.resize(
-            img, (conf.image_size, conf.image_size),
-            interpolation=cv2.INTER_AREA)
-{%- elif cookiecutter.augmentation == "False" %}
-        crop_size = round(conf.image_size*conf.crop_size)
-        img = cv2.resize(img, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
-{%- endif %}
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_file = self.files[index]
+        assert os.path.isfile(img_file)
+        # read image
+        img = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
+        img = np.stack((img, img, img), axis=2)
+        img = img.astype(np.float32)
+        max_val = img.max()
+        if max_val != 0:
+            img /= max_val
+        img = self.resize(img)
+
+        # read mask
+        msk_file = self.masks[index]
+        msk = cv2.imread(msk_file, cv2.IMREAD_UNCHANGED)
+        msk = self.resize(msk)
+        msk = msk.astype(np.float32)
         if self.transform:
-            img = self.transform(image=img)['image']
-        label = self.labels[index]
-        return img, label
+            result = self.transform(image=img, mask=msk)
+            img, msk = result['image'], result['mask']
+        return img, msk
 
     def __len__(self):
         return len(self.files)

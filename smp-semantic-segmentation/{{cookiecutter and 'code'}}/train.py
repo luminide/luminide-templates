@@ -5,7 +5,7 @@ import multiprocessing as mp
 from datetime import datetime
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score
+import segmentation_models_pytorch as smp
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -14,14 +14,14 @@ from torch import nn
 import torch.utils.data as data
 {%- if cookiecutter.AMP == "True" %}
 from torch import autocast
-from torch.cuda.amp import GradScaler 
+from torch.cuda.amp import GradScaler
 {%- endif %}
 
 from augment import make_train_augmenter
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
-from util import LossHistory, get_class_names, make_test_augmenter
+import util
 
 
 parser = argparse.ArgumentParser()
@@ -76,20 +76,25 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
             self.optimizer, gamma=conf.gamma)
+        self.loss_funcs = [
+            smp.losses.SoftBCEWithLogitsLoss(),
+            smp.losses.TverskyLoss(mode='multilabel', log_loss=False),
+        ]
         self.history = None
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
-        df = pd.read_csv(meta_file, dtype=str)
-        class_names = get_class_names(df)
+        meta_df = pd.read_csv(meta_file, dtype=str)
+        class_names = util.get_class_names(meta_df)
         self.num_classes = len(class_names)
 
+        df = util.process_files(self.input_dir, '{{ cookiecutter.train_image_dir }}', meta_df, class_names)
         # shuffle
         df = df.sample(frac=1, random_state=0).reset_index(drop=True)
         train_aug = make_train_augmenter(conf)
-        test_aug = make_test_augmenter(conf)
+        test_aug = util.make_test_augmenter(conf)
 
         # split into train and validation sets
         split = df.shape[0]*90//100
@@ -125,7 +130,7 @@ class Trainer:
         best_loss = None
         patience = self.max_patience
         self.sample_count = 0
-        self.history = LossHistory()
+        self.history = util.LossHistory()
 
         print(f'Running on {device}')
         print(f'{len(self.train_loader.dataset)} examples in training set')
@@ -169,8 +174,13 @@ class Trainer:
             self.history.save()
         writer.close()
 
+    def criterion(self, outputs, labels):
+        result = 0
+        for func in self.loss_funcs:
+            result += func(outputs, labels)
+        return result
+
     def train_epoch(self, epoch):
-        loss_func = nn.BCEWithLogitsLoss()
         model = self.model
         optimizer = self.optimizer
 
@@ -194,7 +204,7 @@ class Trainer:
 {%- elif cookiecutter.AMP == "False" %}
                         val_outputs = model(val_images)
 {%- endif %}
-                        val_loss = loss_func(val_outputs, val_labels)
+                        val_loss = self.criterion(val_outputs, val_labels)
                         self.history.add_val_loss(epoch, self.sample_count, val_loss.item())
                 except StopIteration:
                     pass
@@ -208,10 +218,10 @@ class Trainer:
             # use AMP
             with autocast(device_type, enabled=self.use_amp):
                 outputs = model(images)
-                loss = loss_func(outputs, labels)
+                loss = self.criterion(outputs, labels)
 {%- elif cookiecutter.AMP == "False" %}
             outputs = model(images)
-            loss = loss_func(outputs, labels)
+            loss = self.criterion(outputs, labels)
 {%- endif %}
 
             train_loss_list.append(loss.item())
@@ -238,13 +248,9 @@ class Trainer:
         return mean_train_loss
 
     def validate(self):
-        loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
-        all_labels = np.zeros(
-            (len(self.val_loader.dataset), self.num_classes), dtype=np.float32)
-        preds = np.zeros_like(all_labels)
-        start_idx = 0
+        scores = []
         self.model.eval()
         with torch.no_grad():
             for images, labels in self.val_loader:
@@ -256,17 +262,10 @@ class Trainer:
 {%- elif cookiecutter.AMP == "False" %}
                 outputs = self.model(images)
 {%- endif %}
-                end_idx = start_idx + outputs.shape[0]
-                all_labels[start_idx:end_idx] = labels.cpu().numpy()
-                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
-                start_idx = end_idx
-                losses.append(loss_func(outputs, labels).item())
-
-        if np.isfinite(preds).all():
-            score = f1_score(all_labels, preds, average='micro')
-        else:
-            score = np.nan
-        return np.mean(losses), score
+                preds = sigmoid(outputs).round().to(torch.float32)
+                scores.append(util.dice_coeff(labels, preds).item())
+                losses.append(self.criterion(outputs, labels).item())
+        return np.mean(losses), np.mean(scores)
 
 
 def worker_init_fn(worker_id):

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import segmentation_models_pytorch as smp
 import timm
 
 
@@ -6,9 +7,10 @@ class ModelWrapper(nn.Module):
 
     def __init__(self, conf, num_classes):
         super().__init__()
-        self.model = timm.create_model(
-            conf.arch, conf.pretrained,
-            num_classes=num_classes, drop_rate=conf.dropout_rate)
+        weights = 'imagenet' if conf.pretrained else None
+        self.model = smp.FPN(
+            encoder_name=conf.arch, encoder_weights=weights, in_channels=3,
+            classes=num_classes, activation=None)
 
     def forward(self, x):
         x = self.model(x)

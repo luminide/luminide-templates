@@ -30,7 +30,6 @@ parameters:
     min: 0.8
     max: 0.96
     q: 0.04
-{%- if cookiecutter.augmentation == "True" %}
   aug_prob:
     distribution: uniform
     min: 0.0
@@ -42,4 +41,3 @@ parameters:
     q: 10
   strong_aug:
     values: [True, False]
-{%- endif %}
