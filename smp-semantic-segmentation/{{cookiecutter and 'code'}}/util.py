@@ -81,7 +81,7 @@ def process_files(input_dir, img_dir, meta_df, class_names):
     if os.path.exists(filename):
         df = pd.read_csv(filename)
         # delete bad data
-        df = df[~df['img_files'].str.contains('case7_day0') & ~df['id'].str.contains('case81_day30')].reset_index(drop=True)
+        df = df[~df['img_files'].str.contains('case7_day0') & ~df['img_files'].str.contains('case81_day30')].reset_index(drop=True)
         return df
 
     img_files = []
@@ -128,6 +128,5 @@ def make_test_augmenter(conf):
     crop_size = round(conf.image_size*conf.crop_size)
     return  A.Compose([
         A.CenterCrop(height=crop_size, width=crop_size),
-        A.Normalize(max_pixel_value=1.0),
         ToTensorV2(transpose_mask=True)
     ])

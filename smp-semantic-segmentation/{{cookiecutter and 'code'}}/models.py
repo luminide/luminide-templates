@@ -9,7 +9,7 @@ class ModelWrapper(nn.Module):
         super().__init__()
         weights = 'imagenet' if conf.pretrained else None
         self.model = smp.FPN(
-            encoder_name=conf.arch, encoder_weights=weights, in_channels=3,
+            encoder_name=conf.arch, encoder_weights=weights, in_channels=5,
             classes=num_classes, activation=None)
 
     def forward(self, x):
