@@ -18,6 +18,6 @@ batch_size: 32
 gamma: 0.96
 
 # data augmentation
-aug_prob: 0.1
-strong_aug: false
+aug_prob: 0.4
+strong_aug: true
 max_cutout: 0

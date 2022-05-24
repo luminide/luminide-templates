@@ -6,7 +6,6 @@ def make_train_augmenter(conf):
     p = conf.aug_prob
     if p <= 0:
         return A.Compose([
-            A.Normalize(max_pixel_value=1.0),
             ToTensorV2(transpose_mask=True)
         ])
 
@@ -36,23 +35,20 @@ def make_train_augmenter(conf):
 
     if conf.strong_aug:
         aug_list.extend([
-            A.GaussNoise(p=0.2*p),
+            A.GaussNoise(var_limit=0.001, p=0.2*p),
             A.OneOf([
                 A.OpticalDistortion(p=0.3*p),
                 A.GridDistortion(p=0.1*p),
                 A.PiecewiseAffine(p=0.3*p),
             ], p=0.2*p),
             A.OneOf([
-                A.CLAHE(clip_limit=2, p=0.2*p),
                 A.Sharpen(p=0.2*p),
                 A.Emboss(p=0.2*p),
                 A.RandomBrightnessContrast(p=0.2*p),
-                A.ColorJitter(p=0.2*p),
             ], p=0.3*p),
         ])
 
     aug_list.extend([
-        A.Normalize(max_pixel_value=1.0),
         ToTensorV2(transpose_mask=True)
     ])
 

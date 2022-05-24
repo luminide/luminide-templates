@@ -26,13 +26,30 @@ class VisionDataset(data.Dataset):
             img, (self.conf.image_size, self.conf.image_size),
             interpolation=cv2.INTER_AREA)
 
+    def load_slice(self, img_file, diff):
+        slice_num = os.path.basename(img_file).split('_')[1]
+        filename = img_file.replace('slice_' + slice_num, 'slice_' + str(int(slice_num) + diff).zfill(4))
+        if not os.path.exists(filename):
+            return None
+        return cv2.imread(filename, cv2.IMREAD_UNCHANGED)
+
     def __getitem__(self, index):
         conf = self.conf
         img_file = self.files[index]
         assert os.path.isfile(img_file)
-        # read image
-        img = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
-        img = np.stack((img, img, img), axis=2)
+        # read 5 slices into one image
+        imgs = [self.load_slice(img_file, i) for i in range(-2, 3)]
+        assert imgs[2] is not None
+        if imgs[3] is None:
+            imgs[3] = imgs[2]
+        if imgs[4] is None:
+            imgs[4] = imgs[3]
+        if imgs[1] is None:
+            imgs[1] = imgs[2]
+        if imgs[0] is None:
+            imgs[0] = imgs[1]
+        img = np.stack(imgs, axis=2)
+
         img = img.astype(np.float32)
         max_val = img.max()
         if max_val != 0:
