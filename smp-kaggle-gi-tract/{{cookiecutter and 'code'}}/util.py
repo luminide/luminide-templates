@@ -3,6 +3,7 @@ from glob import glob
 import cv2
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
@@ -108,22 +109,21 @@ def process_files(input_dir, img_dir, meta_df, class_names):
     df.to_csv(filename, index=False)
     return df
 
-def search_layer(module, layer_type, reverse=True):
-    if isinstance(module, layer_type):
-        return module
-
-    if not hasattr(module, 'children'):
-        return None
-
-    children = list(module.children())
-    if reverse:
-        children = reversed(children)
-    # search for the first occurence recursively
-    for child in children:
-        res = search_layer(child, layer_type)
-        if res:
-            return res
-    return None
+def visualize(**images):
+    n = len(images)
+    plt.figure(figsize=(16, 5))
+    for i, (name, image) in enumerate(images.items()):
+        image = image.transpose((1, 2, 0))
+        image -= image.min()
+        max_val = image.max()
+        if max_val != 0:
+            image /= max_val
+        plt.subplot(1, n, i + 1)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title(name)
+        plt.imshow(image)
+    plt.show()
 
 def make_test_augmenter(conf):
     crop_size = round(conf.image_size*conf.crop_size)

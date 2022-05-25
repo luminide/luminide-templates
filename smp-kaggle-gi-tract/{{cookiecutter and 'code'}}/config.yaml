@@ -6,11 +6,11 @@ pretrained: true
 # resize images to this size on the fly
 image_size: 320
 # crop to this fraction of image_size
-crop_size: 0.8
+crop_size: 0.9
 
 # optimizer settings
 optim: adam
-lr: 0.001
+lr: 0.002
 weight_decay: 0.01
 batch_size: 32
 
