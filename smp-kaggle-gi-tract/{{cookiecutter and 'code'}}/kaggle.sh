@@ -4,12 +4,10 @@
 # It creates a dataset on Kaggle with all the files required to
 # make a submission.
 
-dataset_name=kagglecode
+dataset_name=kagglecode1
 mkdir -p ../$dataset_name
 
-echo
-echo $(tput -T xterm setaf 4)Press enter to upload the code to a private dataset on Kaggle$(tput -T xterm sgr0)
-read
+echo $(tput -T xterm setaf 4)Uploading the code to a private dataset on Kaggle... $(tput -T xterm sgr0)
 
 # check for Kaggle API credentials
 [[ ! -f ~/.kaggle/kaggle.json ]]  && { echo 'error: Kaggle API token needs to be configured using the "Import Data" tab'; exit 1; }

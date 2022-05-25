@@ -6,7 +6,8 @@
                 "PyTorch",
                 "timm",
                 "albumentations",
-                "detectron2"
+                "detectron2",
+                "SMP"
             ]
         },
         {
@@ -51,6 +52,12 @@
             "description": "Identify bird calls in soundscapes",
             "directory": "pytorch-kaggle-bird-clef",
             "tags": [ "PyTorch", "timm", "Audio", "Classification", "Multi-label"]
+        },
+        {
+            "name": "UW-Madison GI Tract Image Segmentation",
+            "description": "Track healthy organs in medical scans to improve cancer treatment",
+            "directory": "smp-kaggle-gi-tract",
+            "tags": [ "SMP", "Computer Vision", "Segmentation" ]
         }
     ]
 }

@@ -35,7 +35,7 @@ parser.add_argument(
     '-p', '--print-interval', default=100, type=int, metavar='N',
     help='print-interval in batches')
 parser.add_argument(
-    '--seed', default=0, type=int,
+    '--seed', default=None, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
@@ -102,10 +102,10 @@ class Trainer:
         val_df = df.iloc[split:].reset_index(drop=True)
         train_dataset = VisionDataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, train_aug, subset)
+            class_names, train_aug, subset=subset)
         val_dataset = VisionDataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
-            class_names, test_aug, subset)
+            class_names, test_aug, subset=subset)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = data.DataLoader(
             train_dataset, batch_size=conf.batch_size, shuffle=True,
