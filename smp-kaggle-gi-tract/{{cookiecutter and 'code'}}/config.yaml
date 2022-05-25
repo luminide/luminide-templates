@@ -10,7 +10,7 @@ crop_size: 0.9
 
 # optimizer settings
 optim: adam
-lr: 0.002
+lr: 0.001
 weight_decay: 0.01
 batch_size: 32
 
