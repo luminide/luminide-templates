@@ -4,12 +4,13 @@ import cv2
 
 def make_train_augmenter(conf):
     p = conf.aug_prob
+    crop_size = round(conf.image_size*conf.crop_size)
     if p <= 0:
         return A.Compose([
+            A.RandomCrop(height=crop_size, width=crop_size, always_apply=True),
             ToTensorV2(transpose_mask=True)
         ])
 
-    crop_size = round(conf.image_size*conf.crop_size)
     aug_list = []
     if conf.max_cutout > 0:
         aug_list.extend([

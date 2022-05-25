@@ -12,11 +12,6 @@ parameters:
     min: 0.0
     max: 0.01
     q: 0.001
-  crop_size:
-    distribution: q_uniform
-    min: 0.8
-    max: 0.9
-    q: 0.1
   aug_prob:
     distribution: uniform
     min: 0.1
