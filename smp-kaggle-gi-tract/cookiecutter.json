@@ -7,6 +7,5 @@
     "label_column": "class",
     "annotation_column": "segmentation",
     "data_subset_percentage": 100,
-    "AMP": ["True", "False"],
-    "Kaggle": ["True", "False"]
+    "AMP": ["True", "False"]
 }

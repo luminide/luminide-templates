@@ -1,5 +1,5 @@
 import os
-import glob
+from glob import glob
 import cv2
 import numpy as np
 import pandas as pd
@@ -34,8 +34,10 @@ def get_class_names(df):
     return labels.unique()
 
 def get_id(filename):
+    # e.g. filename: case123_day20/scans/slice_0001_266_266_1.50_1.50.png
+    # id: case123_day20_slice_0001
     tokens = filename.split('/')
-    return tokens[-3] + '_' + '_'.join(tokens[-1].split('_')[0:2])
+    return tokens[-3] + '_' + '_'.join(tokens[-1].split('_')[:2])
 
 # adapted from https://www.kaggle.com/paulorzp/run-length-encode-and-decode
 def rle_decode(mask_rle, shape):
@@ -60,7 +62,6 @@ def get_mask(filename, meta_df, class_names):
     basename = os.path.basename(filename)
     tokens = basename.split('_')
     height, width = int(tokens[3]), int(tokens[2])
-    #height, width = cv2.imread(filename).shape[:2]
     mask = np.zeros((height, width, len(class_names)), dtype=np.uint8)
     class_map = {name: i for i, name in enumerate(class_names)}
     for anno_id, row in annos.iterrows():
@@ -87,7 +88,7 @@ def process_files(input_dir, img_dir, meta_df, class_names):
     img_files = []
     subdir = ''
     while len(img_files) == 0:
-        img_files = sorted(glob.glob(f'{input_dir}/{img_dir}/{subdir}*.{{ cookiecutter.file_extension }}'))
+        img_files = sorted(glob(f'{input_dir}/{img_dir}/{subdir}*.{{ cookiecutter.file_extension }}'))
         subdir += '*/'
         if len(subdir) > 10:
             return None
@@ -95,14 +96,14 @@ def process_files(input_dir, img_dir, meta_df, class_names):
     mask_dir = '../masks'
     for img_file in img_files:
         mask = get_mask(img_file, meta_df, class_names)
-        basename = '/'.join(img_file.split('/')[3:])
+        basename = img_file.replace(f'{input_dir}/{img_dir}/', '')
         mask_filename = f'{mask_dir}/{basename}'
         dirname = os.path.dirname(mask_filename)
         os.makedirs(dirname, exist_ok=True)
         cv2.imwrite(mask_filename, mask)
     df = pd.DataFrame()
     # delete common prefix from paths
-    img_files = ['/'.join(f.split('/')[3:]) for f in img_files]
+    img_files = [f.replace(f'{input_dir}/{img_dir}/', '') for f in img_files]
     df['img_files'] = img_files
     df.to_csv(filename, index=False)
     return df

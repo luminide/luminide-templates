@@ -1,7 +1,7 @@
-# this can be any network from the timm library
-arch: efficientnet-b3
+# FPN, Unet or DeepLab
+arch: FPN
+backbone: efficientnet-b3
 pretrained: true
-dropout_rate: 0.5
 
 # resize images to this size on the fly
 image_size: 320
