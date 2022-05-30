@@ -17,7 +17,7 @@ class ModelWrapper(nn.Module):
 
         weights = 'imagenet' if conf.pretrained else None
         self.model = arch(
-            encoder_name=conf.backbone, encoder_weights=weights, in_channels=5,
+            encoder_name=conf.backbone, encoder_weights=weights, in_channels=conf.num_slices,
             classes=num_classes, activation=None)
 
     def forward(self, x):
