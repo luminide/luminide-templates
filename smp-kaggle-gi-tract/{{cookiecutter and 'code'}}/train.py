@@ -1,6 +1,7 @@
 import os
 import argparse
 import random
+import re
 import multiprocessing as mp
 from datetime import datetime
 import numpy as np
@@ -126,6 +127,14 @@ class Trainer:
                 weight_decay=conf.weight_decay)
         return None
 
+    def save_model(self, state):
+        model_id = 0
+        model_files = glob('model*.pth')
+        # find a number that has not been taken
+        if len(model_files) != 0:
+            model_id = np.max([int(re.findall('\d+', filename)[0]) for filename in model_files]) + 1
+        torch.save(state, f'model{model_id}.pth')
+
     def fit(self, epochs):
         best_loss = None
         patience = self.max_patience
@@ -161,7 +170,7 @@ class Trainer:
                     'optimizer' : self.optimizer.state_dict(),
                     'conf': self.conf.as_dict()
                 }
-                torch.save(state, 'model.pth')
+                self.save_model(state)
                 patience = self.max_patience
             else:
                 patience -= 1
