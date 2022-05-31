@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import segmentation_models_pytorch as smp
+from glob import glob
 
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -82,6 +83,12 @@ class Trainer:
             smp.losses.TverskyLoss(mode='multilabel', log_loss=False),
         ]
         self.history = None
+        self.model_id = 0
+        model_files = glob('model*.pth')
+        # find a number that has not been taken
+        if len(model_files) != 0:
+            self.model_id = np.max([int(re.findall('\d+', filename)[0]) for filename in model_files]) + 1
+        print(f'The best model will be saved as model{self.model_id}.pth')
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
@@ -128,12 +135,7 @@ class Trainer:
         return None
 
     def save_model(self, state):
-        model_id = 0
-        model_files = glob('model*.pth')
-        # find a number that has not been taken
-        if len(model_files) != 0:
-            model_id = np.max([int(re.findall('\d+', filename)[0]) for filename in model_files]) + 1
-        torch.save(state, f'model{model_id}.pth')
+        torch.save(state, f'model{self.model_id}.pth')
 
     def fit(self, epochs):
         best_loss = None
