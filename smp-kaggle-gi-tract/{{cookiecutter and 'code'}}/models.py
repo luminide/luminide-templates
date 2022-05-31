@@ -10,6 +10,8 @@ class ModelWrapper(nn.Module):
             arch = smp.FPN
         elif conf.arch == 'Unet':
             arch = smp.Unet
+        elif conf.arch == 'Unet++':
+            arch = smp.UnetPlusPlus
         elif conf.arch == 'DeepLabV3':
             arch = smp.DeepLabV3
         else:

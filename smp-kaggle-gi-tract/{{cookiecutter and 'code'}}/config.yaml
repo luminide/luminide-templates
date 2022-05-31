@@ -1,4 +1,4 @@
-# FPN, Unet or DeepLabV3
+# FPN, Unet, Unet++ or DeepLabV3
 arch: FPN
 backbone: efficientnet-b3
 pretrained: true
