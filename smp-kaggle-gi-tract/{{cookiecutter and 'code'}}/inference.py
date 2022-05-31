@@ -40,8 +40,8 @@ def create_test_loader(conf, input_dir, class_names):
         num_workers=mp.cpu_count(), pin_memory=False)
     return loader, test_df
 
-def create_model(model_dir, num_classes):
-    checkpoint = torch.load(f'{model_dir}/model.pth', map_location=device)
+def create_model(model_file, num_classes):
+    checkpoint = torch.load(model_file, map_location=device)
     conf = Config(checkpoint['conf'])
     conf.pretrained = False
     model = ModelWrapper(conf, num_classes)
@@ -68,35 +68,24 @@ def get_img_shape(filename):
     height, width = int(tokens[3]), int(tokens[2])
     return (height, width)
 
-def pad_mask(conf, mask):
+def pad_mask(conf, mask, num_classes):
     # pad image to conf.image_size
-    padded = np.zeros((conf.image_size, conf.image_size), dtype=mask.dtype)
-    dh = conf.image_size - mask.shape[0]
-    dw = conf.image_size - mask.shape[1]
+    padded = np.zeros((num_classes, conf.image_size, conf.image_size), dtype=mask.dtype)
+    _, height, width = mask.shape
+    dh = conf.image_size - height
+    dw = conf.image_size - width
 
     top = dh//2
     left = dw//2
-    padded[top:top + mask.shape[0], left:left + mask.shape[1]] = mask
+    padded[:, top:top + height, left:left + width] = mask
     return padded
 
 def resize_mask(mask, height, width):
-    return cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+    mask = mask.transpose((1, 2, 0))
+    mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+    return mask.transpose((2, 0, 1))
 
-def run(input_dir, model_dir, thresh):
-    meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
-    train_df = pd.read_csv(meta_file, dtype=str)
-    class_names = np.array(get_class_names(train_df))
-    num_classes = len(class_names)
-
-    model, conf = create_model(model_dir, num_classes)
-    loader, df = create_test_loader(conf, input_dir, class_names)
-    img_files = df['img_files']
-
-    subm = pd.read_csv(f'{input_dir}/sample_submission.csv')
-    del subm['predicted']
-
-    ids = []
-    classes = []
+def test(conf, loader, model, img_files, num_classes):
     masks = []
     img_idx = 0
     sigmoid = nn.Sigmoid()
@@ -106,28 +95,66 @@ def run(input_dir, model_dir, thresh):
             images = images.to(device)
             outputs = model(images)
             preds = sigmoid(outputs).cpu().numpy()
-            preds[preds >= thresh] = 1
-            preds[preds < thresh] = 0
+            img_file = img_files[img_idx]
+            img_idx += 1
+            height, width = get_img_shape(img_file)
             for pred in preds:
-                img_file = img_files[img_idx]
-                img_idx += 1
-                img_id = get_id(img_file)
-                height, width = get_img_shape(img_file)
-                for class_id, class_name in enumerate(class_names):
-                    mask = pred[class_id]
-                    mask = pad_mask(conf, mask)
-                    mask = resize_mask(mask, height, width)
-                    enc_mask = '' if mask.sum() == 0 else rle_encode(mask)
-                    ids.append(img_id)
-                    classes.append(class_name)
-                    masks.append(enc_mask)
+                pred = pad_mask(conf, pred, num_classes)
+                pred = resize_mask(pred, height, width)
+                masks.append(pred)
+    return masks
+
+def save_results(input_dir, preds, img_files, class_names, thresh):
+    assert len(preds) == len(img_files)
+    ids = []
+    classes = []
+    masks = []
+    for i, pred in enumerate(preds):
+        pred[pred >= thresh] = 1
+        pred[pred < thresh] = 0
+        img_file = img_files[i]
+        img_id = get_id(img_file)
+        for class_id, class_name in enumerate(class_names):
+            mask = pred[class_id]
+            enc_mask = '' if mask.sum() == 0 else rle_encode(mask)
+            ids.append(img_id)
+            classes.append(class_name)
+            masks.append(enc_mask)
 
     pred_df = pd.DataFrame({'id': ids, 'class': classes, 'predicted': masks})
+    subm = pd.read_csv(f'{input_dir}/sample_submission.csv')
+    del subm['predicted']
+
     if pred_df.shape[0] > 0:
         # sort according to the given order and save to a csv file
         subm = subm.merge(pred_df, on=['id', 'class'])
     subm.to_csv('submission.csv', index=False)
 
+def run(input_dir, model_files, thresh):
+    meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
+    train_df = pd.read_csv(meta_file, dtype=str)
+    class_names = np.array(get_class_names(train_df))
+    num_classes = len(class_names)
+
+    # average predictions from multiple models
+    for i, model_file in enumerate(model_files):
+        print(model_file)
+        model, conf = create_model(model_file, num_classes)
+        print(conf)
+        loader, df = create_test_loader(conf, input_dir, class_names)
+        img_files = df['img_files']
+        preds = test(conf, loader, model, img_files, num_classes)
+        if i == 0:
+            masks = preds
+        else:
+            for j, pred in enumerate(preds):
+                masks[j] += pred
+    for k in range(len(masks)):
+        masks[k] /= len(model_files)
+    save_results(input_dir, masks, img_files, class_names, thresh)
+
 if __name__ == '__main__':
     test_thresh = 0.5
-    run('../input', './', test_thresh)
+    model_dir = './'
+    model_files = sorted(glob(f'{model_dir}/model*.pth'))
+    run('../input', model_files, test_thresh)
