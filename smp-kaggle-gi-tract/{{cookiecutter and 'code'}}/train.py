@@ -86,9 +86,9 @@ class Trainer:
         self.model_id = 0
         model_files = glob('model*.pth')
         # find a number that has not been taken
-        if len(model_files) != 0:
-            self.model_id = np.max([int(re.findall('\d+', filename)[0]) for filename in model_files]) + 1
-        print(f'The best model will be saved as model{self.model_id}.pth')
+        nums = list(map(int, re.findall('\d+', ' '.join(model_files))))
+        if len(nums) > 0:
+            self.model_id = np.max(nums) + 1
 
     def create_dataloaders(self, num_workers, subset):
         conf = self.conf
@@ -151,6 +151,7 @@ class Trainer:
         log_dir = f"runs/{datetime.now().strftime('%b%d_%H-%M-%S')}{suffix}"
         writer = SummaryWriter(log_dir=log_dir)
 
+        print(f'The best model will be saved as model{self.model_id}.pth')
         print('Training in progress...')
         for epoch in range(epochs):
             # train for one epoch
