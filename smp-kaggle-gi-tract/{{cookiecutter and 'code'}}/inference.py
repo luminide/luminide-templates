@@ -22,7 +22,7 @@ def create_test_loader(conf, input_dir, class_names):
     img_dir = 'test'
     img_files = sorted(glob(f'{input_dir}/{img_dir}/**/*.{{ cookiecutter.file_extension }}', recursive=True))
 
-   # delete common prefix from paths
+    # delete common prefix from paths
     img_files = [f.replace(f'{input_dir}/{img_dir}/', '') for f in img_files]
 
     test_df['img_files'] = img_files
