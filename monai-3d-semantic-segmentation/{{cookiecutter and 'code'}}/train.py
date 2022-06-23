@@ -47,7 +47,7 @@ parser.add_argument(
     '-p', '--print-interval', default=100, type=int, metavar='N',
     help='print-interval in batches')
 parser.add_argument(
-    '--seed', default=None, type=int,
+    '--seed', default=0, type=int,
     help='seed for initializing the random number generator')
 parser.add_argument(
     '--resume', default='', type=str, metavar='PATH',
@@ -80,7 +80,7 @@ class Trainer:
             self.scaler = GradScaler()
 {%- endif %}
 
-        self.create_dataloaders(num_workers, subset)
+        self.create_dataloaders(num_workers, subset, random_split=False)
 
         self.model = ModelWrapper(conf, self.num_classes)
         self.model = self.model.to(device)
@@ -116,7 +116,7 @@ class Trainer:
         if len(nums) > 0:
             self.model_id = np.max(nums) + 1
 
-    def create_dataloaders(self, num_workers, subset):
+    def create_dataloaders(self, num_workers, subset, random_split):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
         assert os.path.exists(meta_file), f'{meta_file} not found on Compute Server'
@@ -126,8 +126,9 @@ class Trainer:
 
         df = util.process_files(
             conf, self.input_dir, '{{ cookiecutter.train_image_dir }}', meta_df, class_names)
-        # shuffle
-        df = df.sample(frac=1, random_state=0).reset_index(drop=True)
+        if random_split:
+            # shuffle before splitting into training and validation subsets
+            df = df.sample(frac=1, random_state=0).reset_index(drop=True)
         train_aug = make_train_augmenter(conf)
         val_aug = util.make_val_augmenter(conf)
 
