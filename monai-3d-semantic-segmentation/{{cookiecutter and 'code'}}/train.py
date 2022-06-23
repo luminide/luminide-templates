@@ -106,7 +106,6 @@ class Trainer:
             monai.losses.DiceLoss(
                 sigmoid=True, smooth_nr=0.01, smooth_dr=0.01,
                 include_background=True, batch=True, squared_pred=True),
-            #smp.losses.TverskyLoss(mode='multilabel', log_loss=False),
         ]
         self.history = None
         self.model_id = 0

@@ -90,6 +90,8 @@ def dice_coeff(labels, preds):
     return 2*(labels*preds).sum()/(labels.sum() + preds.sum() + 1e-6)
 
 def hausdorff_score(labels, preds):
+    #XXX return 0 for now
+    return 0.0
     dist = compute_hausdorff_distance(preds, labels).mean().item()
     # labels are in NCHWD format
     max_dist = np.linalg.norm(labels.shape[2:])
