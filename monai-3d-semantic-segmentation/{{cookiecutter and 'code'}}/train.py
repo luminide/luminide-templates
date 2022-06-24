@@ -18,6 +18,8 @@ import torch.utils.data as data
 from torch import autocast
 from torch.cuda.amp import GradScaler
 {%- endif %}
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 import monai
 from monai.data import DataLoader
 from monai.inferers import sliding_window_inference
@@ -35,6 +37,24 @@ warnings.filterwarnings("ignore")
 import resource
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    # initialize the process group
+    dist.init_process_group('nccl', rank=rank, world_size=world_size)
+    n = torch.cuda.device_count() // world_size
+    device_ids = list(range(rank * n, (rank + 1) * n))
+
+    print(
+        f"[{os.getpid()}] rank = {dist.get_rank()}, "
+        + f"world_size = {dist.get_world_size()}, n = {n}, device_ids = {device_ids}"
+    )
+
+
+def cleanup():
+    dist.destroy_process_group()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -68,11 +88,12 @@ device = torch.device(device_type)
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval=100, subset=100):
+            checkpoint, world_size, rank, print_interval=100, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
         self.max_patience = 10
+        self.rank = rank
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
@@ -82,8 +103,9 @@ class Trainer:
 
         self.create_dataloaders(num_workers, subset, random_split=False)
 
-        self.model = ModelWrapper(conf, self.num_classes)
-        self.model = self.model.to(device)
+        model = ModelWrapper(conf, self.num_classes)
+        model = model.to(rank)
+        self.model = DDP(model, device_ids=[rank])
         self.optimizer = self.create_optimizer(conf, self.model)
         assert  self.optimizer is not None, f'Unknown optimizer {conf.optim}'
         if checkpoint:
@@ -141,14 +163,16 @@ class Trainer:
         val_dataset = create_dataset(
             val_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             class_names, val_aug, subset=subset)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
         drop_last = (len(train_dataset) % conf.batch_size) == 1
         self.train_loader = DataLoader(
-            train_dataset, batch_size=conf.batch_size, shuffle=True,
+            train_dataset, batch_size=conf.batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=False,
-            worker_init_fn=worker_init_fn, drop_last=drop_last)
+            worker_init_fn=worker_init_fn, drop_last=drop_last, sampler=train_sampler)
         self.val_loader = DataLoader(
             val_dataset, batch_size=1, shuffle=False,
-            num_workers=num_workers, pin_memory=False)
+            num_workers=num_workers, pin_memory=False, sampler=val_sampler)
 
     def create_optimizer(self, conf, model):
         if conf.optim == 'sgd':
@@ -162,7 +186,8 @@ class Trainer:
         return None
 
     def save_model(self, state):
-        torch.save(state, f'model{self.model_id}.pth')
+        if self.rank == 0:
+            torch.save(state, f'model{self.model_id}.pth')
 
     def fit(self, epochs):
         best_loss = None
@@ -224,6 +249,7 @@ class Trainer:
         model = self.model
         optimizer = self.optimizer
 
+        self.train_loader.sampler.set_epoch(epoch)
         val_iter = iter(self.val_loader)
         val_interval = len(self.train_loader)//len(self.val_loader)
         assert val_interval > 0
@@ -355,8 +381,8 @@ def worker_init_fn(worker_id):
     np.random.seed(random.randint(0, 2**32) + worker_id)
 
 
-def main():
-    args = parser.parse_args()
+def main(rank, ws, args):
+    setup(rank, ws)
     if args.subset != 100:
         print(f'\nWARNING: {args.subset}% of the data will be used for training\n')
     if args.seed is not None:
@@ -364,7 +390,6 @@ def main():
         torch.manual_seed(args.seed)
         cudnn.deterministic = True
     input_dir = args.input
-    model_file = args.resume
     model_file = args.resume or args.validate
     if model_file:
         print(f'Loading model from {model_file}')
@@ -379,7 +404,7 @@ def main():
     print(conf)
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
-        checkpoint, args.print_interval, args.subset)
+        checkpoint, ws, rank, args.print_interval, args.subset)
 
     if args.validate:
         loss, dice, hausdorff = trainer.validate()
@@ -390,5 +415,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = parser.parse_args()
+    ws = torch.cuda.device_count()
+    torch.multiprocessing.spawn(main, nprocs=ws, args=(ws, args))
+    cleanup()
     print('Done')
