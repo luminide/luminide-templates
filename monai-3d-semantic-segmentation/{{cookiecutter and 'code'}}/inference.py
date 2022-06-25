@@ -161,6 +161,7 @@ def test_3d(confs, loaders, models, df, class_names, thresh):
     assert len(studies) == len(loaders[0].dataset)
     sw_batch_size = 4
     flip_dims = [[], [2], [3], [2, 3]]
+    overlap = 0.5
     with torch.no_grad():
         for _, study in studies:
             for i, it in enumerate(iters):
@@ -175,7 +176,8 @@ def test_3d(confs, loaders, models, df, class_names, thresh):
                 for tta in flip_dims:
                     tta_images = torch.flip(images, tta)
                     tta_outputs = sliding_window_inference(
-                        tta_images, roi_size, sw_batch_size, model, mode='gaussian')
+                        tta_images, roi_size, sw_batch_size, model,
+                        mode='gaussian', overlap=overlap)
                     tta_outputs = torch.flip(tta_outputs, tta)
                     if outputs == None:
                         outputs = tta_outputs

@@ -15,6 +15,8 @@ class Config():
             self['restart_iter'] = 100
         if 'dropout' not in self._params:
             self['dropout'] = 0.2
+        if 'sliding_win_overlap' not in self._params:
+            self['sliding_win_overlap'] = 0.25
         if 'tta_flip_dims' not in self._params:
             self['tta_flip_dims'] = [[], [2], [3], [2, 3]]
 

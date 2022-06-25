@@ -165,7 +165,7 @@ def process_files_3d(input_dir, img_dir):
     msk_dir = '../masks'
     nii_dir = '../nifti'
     os.makedirs(nii_dir, exist_ok=True)
-    case_list = glob(f'{input_dir}/{img_dir}/*/*')
+    case_list = sorted(glob(f'{input_dir}/{img_dir}/*/*'))
     print(f'{len(case_list)} cases')
     images = []
     masks = []

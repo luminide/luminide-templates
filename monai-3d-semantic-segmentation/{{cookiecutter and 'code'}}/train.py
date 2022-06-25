@@ -72,7 +72,7 @@ class Trainer:
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
-        self.max_patience = 10
+        self.max_patience = 200
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
@@ -193,16 +193,17 @@ class Trainer:
                 writer.add_scalar('Validation score', val_score, epoch)
                 print(f'Validation loss {val_loss:.4} dice {val_dice:.4} hausdorff {val_hausdorff:.4} score {val_score:.4}')
                 self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
+                state = {
+                    'epoch': epoch, 'model': self.model.state_dict(),
+                    'optimizer' : self.optimizer.state_dict(),
+                    'conf': self.conf.as_dict()
+                }
                 if best_loss is None or val_loss < best_loss:
                     best_loss = val_loss
-                    state = {
-                        'epoch': epoch, 'model': self.model.state_dict(),
-                        'optimizer' : self.optimizer.state_dict(),
-                        'conf': self.conf.as_dict()
-                    }
                     self.save_model(state)
                     patience = self.max_patience
                 else:
+                    torch.save(state, 'latest.pth')
                     patience -= 1
                     if patience == 0:
                         print(
@@ -303,6 +304,7 @@ class Trainer:
         dice = []
         hausdorff = []
         sw_batch_size = 4
+        overlap = self.conf.sliding_win_overlap
         roi_size = (self.conf.test_roi, self.conf.test_roi, self.conf.test_depth)
         flip_dims = self.conf.tta_flip_dims
         self.model.eval()
@@ -317,7 +319,8 @@ class Trainer:
 {%- if cookiecutter.AMP == "True" %}
                     with autocast(device_type, enabled=self.use_amp):
                         tta_outputs = sliding_window_inference(
-                            tta_images, roi_size, sw_batch_size, self.model, mode='gaussian')
+                            tta_images, roi_size, sw_batch_size, self.model,
+                            mode='gaussian', overlap=overlap)
                         tta_outputs = torch.flip(tta_outputs, tta)
                         if outputs == None:
                             outputs = tta_outputs
@@ -328,7 +331,8 @@ class Trainer:
                     losses.append(self.criterion(outputs, labels).item())
 {%- elif cookiecutter.AMP == "False" %}
                     tta_outputs = sliding_window_inference(
-                        tta_images, roi_size, sw_batch_size, self.model, mode='gaussian')
+                        tta_images, roi_size, sw_batch_size, self.model,
+                        mode='gaussian', overlap=overlap)
                     tta_outputs = torch.flip(tta_outputs, tta)
                     if outputs == None:
                         outputs = tta_outputs
@@ -370,7 +374,7 @@ def main():
         print(f'Loading model from {model_file}')
         checkpoint = torch.load(model_file)
         conf = Config(checkpoint['conf'])
-        #XXX
+        # XXX
         conf['tta_flip_dims'] = [[], [2], [3], [2, 3]]
     else:
         checkpoint = None
