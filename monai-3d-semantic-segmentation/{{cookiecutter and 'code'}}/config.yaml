@@ -1,14 +1,10 @@
 # FPN, Unet, Unet++, DeepLabV3, Unet3D
-arch: Unet3D
-backbone: efficientnet-b3
+arch: FPN
+backbone: efficientnet-b7
 pretrained: true
 res_units: 2
 
 num_slices: 5
-# resize images to this size on the fly
-image_size: 360
-# crop to this fraction of image_size
-crop_size: 0.89
 multi_slice_label: false
 
 # optimizer settings
@@ -17,17 +13,16 @@ lr: 5.0e-4
 min_lr: 1.0e-6
 dropout: 0.2
 weight_decay: 1.0e-6
-batch_size: 4
+batch_size: 16
 
 # scheduler settings
-scheduler: 'cos'
-restart_iter: 100
+restart_epoch: {'FPN': 5, 'Unet3D': 100}
 gamma: 0.98
 
 # data augmentation
 aug_prob: 0.6
 strong_aug: true
-max_cutout: 0
+max_cutout: 10
 tta_flip_dims: [[]]
 #tta_flip_dims: [[], [2], [3], [2, 3]]
 

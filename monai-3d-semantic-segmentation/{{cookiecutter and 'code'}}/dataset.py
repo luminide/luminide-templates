@@ -27,10 +27,6 @@ class VisionDataset(torchdata.Dataset):
         self.files = [os.path.join(input_dir, imgs_dir, f) for f in files]
         self.masks = [os.path.join('../masks', f) for f in files]
 
-    def resize(self, img, interp):
-        return  cv2.resize(
-            img, (self.conf.image_size, self.conf.image_size), interpolation=interp)
-
     def load_slice(self, img_file, diff, interp):
         slice_num = os.path.basename(img_file).split('_')[1]
         filename = (
@@ -39,7 +35,8 @@ class VisionDataset(torchdata.Dataset):
                 'slice_' + str(int(slice_num) + diff).zfill(4)))
         if os.path.exists(filename):
             img = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
-            img = self.resize(img, interp)
+            assert img.shape[0] > self.conf.train_roi
+            assert img.shape[1] > self.conf.train_roi
             return img.astype(np.float32)
         return None
 
@@ -50,12 +47,14 @@ class VisionDataset(torchdata.Dataset):
         img_file = self.files[index]
         # read multiple slices into one image
         # in HWD format
-        img = np.zeros(
-            (conf.image_size, conf.image_size, num_slices), dtype=np.float32)
+        img = None
         for i, diff in enumerate(range(-(num_slices//2), num_slices//2 + 1)):
             slc =  self.load_slice(img_file, diff, cv2.INTER_AREA)
             if slc is None:
                 continue
+            if img is None:
+                img = np.zeros(
+                    (slc.shape[0], slc.shape[1], num_slices), dtype=np.float32)
             img[:, :, i] = slc
 
         max_val = img.max()
@@ -70,25 +69,31 @@ class VisionDataset(torchdata.Dataset):
             # read mask
             msk_file = self.masks[index]
             if conf.multi_slice_label:
-                msk = np.zeros(
-                    (conf.image_size, conf.image_size, self.num_classes*num_slices), dtype=np.float32)
+                msk = None
                 for i, diff in enumerate(range(-(num_slices//2), num_slices//2 + 1)):
                     slc =  self.load_slice(msk_file, diff, cv2.INTER_NEAREST)
                     if slc is None:
                         continue
+                    if msk is None:
+                        msk = np.zeros(
+                            (slc.shape[0], slc.shape[1], self.num_classes*num_slices), dtype=np.float32)
                     start = i*self.num_classes
                     msk[:, :, start:start + self.num_classes] = slc
             else:
                 # in HWC format
                 msk = cv2.imread(msk_file, cv2.IMREAD_UNCHANGED)
-                msk = self.resize(msk, cv2.INTER_NEAREST)
+                assert img.shape[0] > self.conf.train_roi
+                assert img.shape[1] > self.conf.train_roi
                 msk = msk.astype(np.float32)
             result = self.transform(image=img, mask=msk)
             img, msk = result['image'], result['mask']
-        return img, msk
+        return {'img': img, 'msk': msk}
 
     def __len__(self):
         return len(self.files)
+
+    def set_random_state(self, seed):
+        pass
 
 class VisionDataset3D(MonaiDataset):
     def __init__(

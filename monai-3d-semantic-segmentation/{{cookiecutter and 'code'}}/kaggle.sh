@@ -45,7 +45,14 @@ do
 done
 
 # copy trained model
-cp -v ../output/model*.pth .
+i=0
+while [ -f model$i.pth ]
+do
+    i=$((i+1))
+done
+cp -v ../output/model.pth model$i.pth
 
 # upload to kaggle
+echo 'Press enter to upload to private dataset on Kaggle'
+read
 kaggle datasets version -m "$(date)"

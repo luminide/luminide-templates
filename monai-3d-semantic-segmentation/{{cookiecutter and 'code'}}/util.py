@@ -231,8 +231,6 @@ def make_val_augmenter(conf):
     if '3D' in conf.arch:
         return make_val_augmenter_3d(conf)
 
-    crop_size = round(conf.image_size*conf.crop_size)
     return  A.Compose([
-        A.CenterCrop(height=crop_size, width=crop_size),
         ToTensorV2(transpose_mask=True)
     ])

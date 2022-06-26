@@ -89,17 +89,13 @@ class Trainer:
         if checkpoint:
             self.model.load_state_dict(checkpoint['model'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
-        if conf.scheduler == 'exp':
-            self.scheduler = torch.optim.lr_scheduler.ExponentialLR(
-                self.optimizer, gamma=conf.gamma)
-        else:
-            num_samples = len(self.train_loader.dataset)
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                self.optimizer,
-                T_0=conf.restart_iter*(num_samples//conf.batch_size),
-                T_mult=1,
-                eta_min=conf.min_lr,
-            )
+        num_samples = len(self.train_loader.dataset)
+        restart_epoch = conf.restart_epoch[conf.arch]
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            self.optimizer,
+            T_0=restart_epoch*(num_samples//conf.batch_size),
+            T_mult=1, eta_min=conf.min_lr,
+        )
 
         self.loss_funcs = [
             smp.losses.SoftBCEWithLogitsLoss(),
@@ -108,12 +104,6 @@ class Trainer:
                 include_background=True, batch=True, squared_pred=True),
         ]
         self.history = None
-        self.model_id = 0
-        model_files = glob('model*.pth')
-        # find a number that has not been taken
-        nums = list(map(int, re.findall('\d+', ' '.join(model_files))))
-        if len(nums) > 0:
-            self.model_id = np.max(nums) + 1
 
     def create_dataloaders(self, num_workers, subset, random_split):
         conf = self.conf
@@ -132,9 +122,10 @@ class Trainer:
         val_aug = util.make_val_augmenter(conf)
 
         # split into train and validation sets
-        split = df.shape[0]*90//100
+        split = df.shape[0]*80//100
         train_df = df.iloc[:split].reset_index(drop=True)
         val_df = df.iloc[split:].reset_index(drop=True)
+
         train_dataset = create_dataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
             class_names, train_aug, subset=subset)
@@ -146,8 +137,9 @@ class Trainer:
             train_dataset, batch_size=conf.batch_size, shuffle=True,
             num_workers=num_workers, pin_memory=False,
             worker_init_fn=worker_init_fn, drop_last=drop_last)
+        val_batch_size = 1
         self.val_loader = DataLoader(
-            val_dataset, batch_size=1, shuffle=False,
+            val_dataset, batch_size=val_batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=False)
 
     def create_optimizer(self, conf, model):
@@ -160,9 +152,6 @@ class Trainer:
                 model.parameters(), lr=conf.lr,
                 weight_decay=conf.weight_decay)
         return None
-
-    def save_model(self, state):
-        torch.save(state, f'model{self.model_id}.pth')
 
     def fit(self, epochs):
         best_loss = None
@@ -178,7 +167,7 @@ class Trainer:
         log_dir = f"runs/{datetime.now().strftime('%b%d_%H-%M-%S')}{suffix}"
         writer = SummaryWriter(log_dir=log_dir)
 
-        print(f'The best model will be saved as model{self.model_id}.pth')
+        print('The best model will be saved as model.pth')
         print('Training in progress...')
         for epoch in range(epochs):
             # train for one epoch
@@ -186,7 +175,7 @@ class Trainer:
             train_loss = self.train_epoch(epoch)
             writer.add_scalar('Training loss', train_loss, epoch)
             print(f'training loss {train_loss:.5f}')
-            if epoch % 5 == 0 and (epoch == 0 or epoch > 20):
+            if epoch % 5 == 0:
                 val_loss, val_dice, val_hausdorff = self.validate()
                 val_score = 0.4*val_dice + 0.6*val_hausdorff
                 writer.add_scalar('Validation loss', val_loss, epoch)
@@ -200,7 +189,7 @@ class Trainer:
                 }
                 if best_loss is None or val_loss < best_loss:
                     best_loss = val_loss
-                    self.save_model(state)
+                    torch.save(state, 'model.pth')
                     patience = self.max_patience
                 else:
                     torch.save(state, 'latest.pth')
@@ -227,7 +216,7 @@ class Trainer:
 
         val_iter = iter(self.val_loader)
         val_interval = len(self.train_loader)//len(self.val_loader)
-        assert val_interval > 0
+        #assert val_interval > 0
         train_loss_list = []
         model.train()
         roi_size = (self.conf.test_roi, self.conf.test_roi, self.conf.test_depth)
@@ -305,7 +294,10 @@ class Trainer:
         hausdorff = []
         sw_batch_size = 4
         overlap = self.conf.sliding_win_overlap
-        roi_size = (self.conf.test_roi, self.conf.test_roi, self.conf.test_depth)
+        if '3D' in self.conf.arch:
+            roi_size = (self.conf.test_roi, self.conf.test_roi, self.conf.test_depth)
+        else:
+            roi_size = (self.conf.test_roi, self.conf.test_roi)
         flip_dims = self.conf.tta_flip_dims
         self.model.eval()
         with torch.no_grad():
@@ -381,6 +373,8 @@ def main():
         conf = Config()
 
     print(conf)
+    if '3D' not in conf.arch:
+        args.print_interval *= 10
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
         checkpoint, args.print_interval, args.subset)

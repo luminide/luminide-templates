@@ -87,7 +87,7 @@ def make_train_augmenter(conf):
         return make_train_augmenter_3d(conf)
 
     p = conf.aug_prob
-    crop_size = round(conf.image_size*conf.crop_size)
+    crop_size = conf.train_roi
     if p <= 0:
         return A.Compose([
             A.RandomCrop(height=crop_size, width=crop_size, always_apply=True),
@@ -108,7 +108,8 @@ def make_train_augmenter(conf):
             shift_limit=0.0625, scale_limit=0.2, rotate_limit=25,
             interpolation=cv2.INTER_AREA, p=p),
         A.RandomCrop(height=crop_size, width=crop_size, always_apply=True),
-        A.HorizontalFlip(p=0.5*p),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
         A.OneOf([
             A.MotionBlur(p=0.2*p),
             A.MedianBlur(blur_limit=3, p=0.1*p),
