@@ -175,7 +175,7 @@ class Trainer:
             train_loss = self.train_epoch(epoch)
             writer.add_scalar('Training loss', train_loss, epoch)
             print(f'training loss {train_loss:.5f}')
-            if epoch % 5 == 0:
+            if epoch % self.conf.val_interval == 0:
                 val_loss, val_dice, val_hausdorff = self.validate()
                 val_score = 0.4*val_dice + 0.6*val_hausdorff
                 writer.add_scalar('Validation loss', val_loss, epoch)

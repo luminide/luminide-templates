@@ -1,6 +1,7 @@
 import os
 from glob import glob
 import cv2
+import torch
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -87,7 +88,10 @@ def get_mask(filename, meta_df, class_names):
     return mask
 
 def dice_coeff(labels, preds):
-    return 2*(labels*preds).sum()/(labels.sum() + preds.sum() + 1e-6)
+    scores = []
+    for idx in range(labels.shape[0]):
+        scores.append(2*(labels[idx]*preds[idx]).sum()/(labels[idx].sum() + preds[idx].sum() + 1e-6))
+    return torch.stack(scores).mean()
 
 def hausdorff_score(labels, preds):
     #XXX return 0 for now

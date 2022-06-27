@@ -6,6 +6,7 @@ res_units: 2
 
 num_slices: 5
 multi_slice_label: false
+val_interval: 1
 
 # optimizer settings
 optim: adam
