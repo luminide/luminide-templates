@@ -11,7 +11,7 @@ from monai.data import Dataset as MonaiDataset
 from monai.data import DataLoader
 from monai.inferers import sliding_window_inference
 
-from util import get_class_names, make_test_augmenter_3d, get_id
+from util import get_class_names, make_val_augmenter, make_test_augmenter_3d, get_id
 from dataset import VisionDataset
 from models import ModelWrapper
 from config import Config
@@ -20,7 +20,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
 
 def create_test_loader(conf, input_dir, class_names):
-    test_aug = make_test_augmenter(conf)
+    test_aug = make_val_augmenter(conf)
     test_df = pd.DataFrame()
     img_dir = 'test'
     img_files = sorted(glob(f'{input_dir}/{img_dir}/**/*.{{ cookiecutter.file_extension }}', recursive=True))
@@ -29,6 +29,7 @@ def create_test_loader(conf, input_dir, class_names):
     img_files = [f.replace(f'{input_dir}/{img_dir}/', '') for f in img_files]
 
     test_df['img_files'] = img_files
+    test_df['study'] = test_df['img_files'].apply(lambda x: x.split('/')[-3])
     test_dataset = VisionDataset(
         test_df, conf, input_dir, img_dir,
         class_names, test_aug, is_test=True)
@@ -104,51 +105,7 @@ def resize_mask(mask, height, width):
     mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
     return mask.transpose((2, 0, 1))
 
-def test(confs, loaders, models, img_files, class_names, thresh):
-    ids = []
-    classes = []
-    masks = []
-    sigmoid = nn.Sigmoid()
-    num_classes = len(class_names)
-    for model in models:
-        model.eval()
-    iters = [iter(loader) for loader in loaders]
-
-    with torch.no_grad():
-        for img_idx, img_file in enumerate(img_files):
-            height, width = get_img_shape(img_file)
-            img_id = get_id(img_file)
-            for i, it in enumerate(iters):
-                conf = confs[i]
-                model = models[i]
-                images, _ = it.next()
-                images = images.to(device)
-                outputs = model(images)
-                pred = sigmoid(outputs).cpu().numpy()[0]
-                if conf.multi_slice_label:
-                    # extract the middle slice
-                    num_slices = conf.num_slices
-                    assert pred.shape[0] == num_slices*num_classes
-                    start = (num_slices//2)*num_classes
-                    pred = pred[start:start + num_classes]
-                pred = pad_mask(conf, pred)
-                pred = resize_mask(pred, height, width)
-                if i == 0:
-                    mean_pred = pred
-                else:
-                    mean_pred += pred
-            mean_pred /= len(iters)
-            for class_id, class_name in enumerate(class_names):
-                mask = mean_pred[class_id]
-                mask[mask >= thresh] = 1
-                mask[mask < thresh] = 0
-                enc_mask = '' if mask.sum() == 0 else rle_encode(mask)
-                ids.append(img_id)
-                classes.append(class_name)
-                masks.append(enc_mask)
-    return ids, classes, masks
-
-def test_3d(confs, loaders, models, df, class_names, thresh):
+def test(confs, loaders, models, df, class_names, thresh):
     ids = []
     classes = []
     masks = []
@@ -158,41 +115,61 @@ def test_3d(confs, loaders, models, df, class_names, thresh):
         model.eval()
     iters = [iter(loader) for loader in loaders]
     studies = df.groupby('study')
-    assert len(studies) == len(loaders[0].dataset)
     sw_batch_size = 4
     flip_dims = [[], [2], [3], [2, 3]]
     overlap = 0.5
     with torch.no_grad():
         for _, study in studies:
+            study_len = len(study['img_files'])
             for i, it in enumerate(iters):
                 conf = confs[i]
                 model = models[i]
-                roi_size = (conf.test_roi, conf.test_roi, conf.test_depth)
-                batch = it.next()
-                images = batch['img'].to(device)
-                # convert from CDWH to CHWD
-                images = images.permute((0, 3, 2, 1)).unsqueeze(0)
-                outputs = None
-                for tta in flip_dims:
-                    tta_images = torch.flip(images, tta)
-                    tta_outputs = sliding_window_inference(
-                        tta_images, roi_size, sw_batch_size, model,
-                        mode='gaussian', overlap=overlap)
-                    tta_outputs = torch.flip(tta_outputs, tta)
-                    if outputs == None:
-                        outputs = tta_outputs
-                    else:
-                        outputs += tta_outputs
-                outputs /= len(flip_dims)
-                pred = sigmoid(outputs).cpu().numpy()[0]
-                #pred = pad_mask(conf, pred)
-                #pred = resize_mask(pred, height, width)
-                assert pred.shape[3] == len(study['img_files'])
-                if i == 0:
-                    mean_pred = pred
+                if '3D' in conf.arch:
+                    is_3d = True
+                    roi_size = (conf.test_roi, conf.test_roi, conf.test_depth)
                 else:
-                    mean_pred += pred
+                    is_3d = False
+                    roi_size = (conf.test_roi, conf.test_roi)
+                study_preds = []
+                pred_len = 0
+                while True:
+                    batch = it.next()
+                    images = batch['img'].to(device)
+                    if is_3d:
+                        # convert from CDWH to CHWD
+                        images = images.permute((0, 3, 2, 1)).unsqueeze(0)
+                    outputs = None
+                    for tta in flip_dims:
+                        tta_images = torch.flip(images, tta)
+                        tta_outputs = sliding_window_inference(
+                            tta_images, roi_size, sw_batch_size, model,
+                            mode='gaussian', overlap=overlap)
+                        tta_outputs = torch.flip(tta_outputs, tta)
+                        if outputs == None:
+                            outputs = tta_outputs
+                        else:
+                            outputs += tta_outputs
+                    outputs /= len(flip_dims)
+                    pred = sigmoid(outputs).cpu().numpy()[0]
+                    study_preds.append(pred)
+                    if is_3d:
+                        assert pred.shape[3] == len(study['img_files'])
+                        break
+                    pred_len += 1
+                    if pred_len == study_len:
+                        break
+                if len(study_preds) > 1:
+                    assert not is_3d
+                    study_preds = np.stack(study_preds, 3)
+                else:
+                    assert is_3d
+                    study_preds = study_preds[0]
+                if i == 0:
+                    mean_pred = study_preds
+                else:
+                    mean_pred += study_preds
             mean_pred /= len(iters)
+            assert mean_pred.shape[3] == study_len
             for slice_idx, img_file in enumerate(study['img_files']):
                 height, width = get_img_shape(img_file)
                 img_id = get_id(img_file)
@@ -241,11 +218,7 @@ def run(input_dir, model_files, thresh):
         confs.append(conf)
         loaders.append(loader)
     # average predictions from multiple models
-    if '3D' in conf.arch:
-        ids, classes, masks = test_3d(confs, loaders, models, df, class_names, thresh)
-    else:
-        img_files = df['img_files']
-        ids, classes, masks = test(confs, loaders, models, img_files, class_names, thresh)
+    ids, classes, masks = test(confs, loaders, models, df, class_names, thresh)
     save_results(input_dir, ids, classes, masks)
 
 if __name__ == '__main__':

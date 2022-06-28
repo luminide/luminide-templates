@@ -87,6 +87,7 @@ class VisionDataset(torchdata.Dataset):
                 msk = msk.astype(np.float32)
             result = self.transform(image=img, mask=msk)
             img, msk = result['image'], result['mask']
+        # return  in CHW format
         return {'img': img, 'msk': msk}
 
     def __len__(self):
