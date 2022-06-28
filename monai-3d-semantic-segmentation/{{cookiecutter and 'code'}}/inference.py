@@ -30,6 +30,13 @@ def create_test_loader(conf, input_dir, class_names):
 
     test_df['img_files'] = img_files
     test_df['study'] = test_df['img_files'].apply(lambda x: x.split('/')[-3])
+    # sort files according to studies
+    studies = [group['img_files'] for _, group in test_df.groupby('study')]
+    new_img_files = []
+    for study in studies:
+        new_img_files.extend(study)
+    test_df['img_files'] = new_img_files
+    test_df['study'] = test_df['img_files'].apply(lambda x: x.split('/')[-3])
     test_dataset = VisionDataset(
         test_df, conf, input_dir, img_dir,
         class_names, test_aug, is_test=True)
@@ -121,6 +128,7 @@ def test(confs, loaders, models, df, class_names, thresh):
     with torch.no_grad():
         for _, study in studies:
             study_len = len(study['img_files'])
+            print('study', study['study'].unique())
             for i, it in enumerate(iters):
                 conf = confs[i]
                 model = models[i]
