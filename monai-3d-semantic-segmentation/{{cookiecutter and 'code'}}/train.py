@@ -187,12 +187,12 @@ class Trainer:
                     'optimizer' : self.optimizer.state_dict(),
                     'conf': self.conf.as_dict()
                 }
+                torch.save(state, 'latest.pth')
                 if best_loss is None or val_loss < best_loss:
                     best_loss = val_loss
                     torch.save(state, 'model.pth')
                     patience = self.max_patience
                 else:
-                    torch.save(state, 'latest.pth')
                     patience -= 1
                     if patience == 0:
                         print(

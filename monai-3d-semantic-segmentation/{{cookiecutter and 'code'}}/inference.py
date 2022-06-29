@@ -124,7 +124,7 @@ def test(confs, loaders, models, df, class_names, thresh):
     studies = df.groupby('study')
     sw_batch_size = 4
     flip_dims = [[], [2], [3], [2, 3]]
-    overlap = 0.5
+    overlap = 0.25
     with torch.no_grad():
         for _, study in studies:
             study_len = len(study['img_files'])
