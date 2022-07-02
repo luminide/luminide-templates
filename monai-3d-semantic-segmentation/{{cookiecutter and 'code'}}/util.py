@@ -89,8 +89,20 @@ def get_mask(filename, meta_df, class_names):
 
 def dice_coeff(labels, preds):
     scores = []
+    is_3d = len(labels.shape) == 5
     for idx in range(labels.shape[0]):
-        scores.append(2*(labels[idx]*preds[idx]).sum()/(labels[idx].sum() + preds[idx].sum() + 1e-6))
+        if is_3d:
+            # NCHWD format
+            for d in range(labels.shape[-1]):
+                label = labels[idx, :, :, :, d]
+                pred = preds[idx, :, :, :, d]
+                score = 2*(label*pred).sum()/(label.sum() + pred.sum() + 1e-6)
+                scores.append(score)
+        else:
+            label = labels[idx]
+            pred = preds[idx]
+            score = 2*(label*pred).sum()/(label.sum() + pred.sum() + 1e-6)
+            scores.append(score)
     return torch.stack(scores).mean()
 
 def hausdorff_score(labels, preds):

@@ -1,12 +1,12 @@
 # FPN, Unet, Unet++, DeepLabV3, Unet3D
-arch: FPN
+arch: Unet3D
 backbone: efficientnet-b7
 pretrained: true
 res_units: 2
 
 num_slices: 5
 multi_slice_label: false
-val_interval: 1
+val_interval: 5
 
 # optimizer settings
 optim: adam
@@ -14,7 +14,7 @@ lr: 5.0e-4
 min_lr: 1.0e-6
 dropout: 0.2
 weight_decay: 1.0e-6
-batch_size: 16
+batch_size: 4
 
 # scheduler settings
 restart_epoch: {'FPN': 5, 'Unet3D': 100}

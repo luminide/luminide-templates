@@ -59,6 +59,9 @@ parser.add_argument(
     '-s', '--subset', default=100, type=int, metavar='N',
     help='use a percentage of the data for training and validation')
 parser.add_argument(
+    '--fold', default=0, type=int, metavar='N',
+    help='validation fold - a number in [0, 4]')
+parser.add_argument(
     '--input', default='../input', metavar='DIR',
     help='input directory')
 
@@ -68,11 +71,12 @@ device = torch.device(device_type)
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
-            checkpoint, print_interval=100, subset=100):
+            checkpoint, fold=0, print_interval=100, subset=100):
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
         self.max_patience = 200
+        self.fold = fold
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
@@ -105,6 +109,15 @@ class Trainer:
         ]
         self.history = None
 
+    def split_data(self, df):
+        num_folds = 5
+        fold_len = df.shape[0]//num_folds
+        fold_start = self.fold*fold_len
+        fold_end = min(df.shape[0], fold_start + fold_len)
+        val_df = df.iloc[fold_start:fold_end].reset_index(drop=True)
+        train_df = pd.concat((df.iloc[:fold_start], df.iloc[fold_end:])).reset_index(drop=True)
+        return train_df, val_df
+
     def create_dataloaders(self, num_workers, subset, random_split):
         conf = self.conf
         meta_file = os.path.join(self.input_dir, '{{ cookiecutter.train_metadata }}')
@@ -118,13 +131,12 @@ class Trainer:
         if random_split:
             # shuffle before splitting into training and validation subsets
             df = df.sample(frac=1, random_state=0).reset_index(drop=True)
+
+       # split into train and validation sets
+        train_df, val_df = self.split_data(df)
+
         train_aug = make_train_augmenter(conf)
         val_aug = util.make_val_augmenter(conf)
-
-        # split into train and validation sets
-        split = df.shape[0]*80//100
-        train_df = df.iloc[:split].reset_index(drop=True)
-        val_df = df.iloc[split:].reset_index(drop=True)
 
         train_dataset = create_dataset(
             train_df, conf, self.input_dir, '{{ cookiecutter.train_image_dir }}',
@@ -169,6 +181,8 @@ class Trainer:
 
         print('The best model will be saved as model.pth')
         print('Training in progress...')
+        #XXX
+        self.conf.val_interval = 5
         for epoch in range(epochs):
             # train for one epoch
             print(f'Epoch {epoch}:')
@@ -377,7 +391,7 @@ def main():
         args.print_interval *= 10
     trainer = Trainer(
         conf, input_dir, device, args.num_workers,
-        checkpoint, args.print_interval, args.subset)
+        checkpoint, args.fold, args.print_interval, args.subset)
 
     if args.validate:
         loss, dice, hausdorff = trainer.validate()

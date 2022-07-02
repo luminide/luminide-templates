@@ -11,8 +11,8 @@
 pip3 install -q -r ../code/requirements.txt
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 2000
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 2000 --fold 0
 {%- else %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 2000 --subset {{ cookiecutter.data_subset_percentage }}
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 2000 --subset {{ cookiecutter.data_subset_percentage }} --fold 0
 {%- endif %}
