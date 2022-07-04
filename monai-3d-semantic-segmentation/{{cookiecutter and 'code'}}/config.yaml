@@ -1,6 +1,6 @@
-# FPN, Unet, Unet++, DeepLabV3, Unet3D
-arch: Unet3D
-backbone: efficientnet-b7
+# FPN, Unet, Unet++, DeepLabV3, Unet3D, Hybrid23D
+arch: Hybrid23D
+backbone: efficientnet-b3
 pretrained: true
 res_units: 2
 
@@ -14,10 +14,10 @@ lr: 5.0e-4
 min_lr: 1.0e-6
 dropout: 0.2
 weight_decay: 1.0e-6
-batch_size: 4
+batch_size: 1
 
 # scheduler settings
-restart_epoch: {'FPN': 5, 'Unet3D': 100}
+restart_epoch: {'FPN': 5, 'Unet3D': 100, 'Hybrid23D': 5}
 gamma: 0.98
 
 # data augmentation

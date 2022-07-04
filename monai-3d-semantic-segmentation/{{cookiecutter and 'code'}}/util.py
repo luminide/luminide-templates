@@ -136,7 +136,7 @@ def process_files(conf, input_dir, img_dir, meta_df, class_names):
         img_files = [f.replace(f'{input_dir}/{img_dir}/', '') for f in img_files]
         df['img_files'] = img_files
         df.to_csv(filename, index=False)
-    if conf.arch == 'Unet3D':
+    if '3D' in conf.arch:
         return process_files_3d(input_dir, img_dir)
     return df
 
