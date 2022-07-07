@@ -94,7 +94,10 @@ class Trainer:
             self.model.load_state_dict(checkpoint['model'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
         num_samples = len(self.train_loader.dataset)
-        restart_epoch = conf.restart_epoch[conf.arch]
+        if conf.arch in conf.restart_epoch:
+            restart_epoch = conf.restart_epoch[conf.arch]
+        else:
+            restart_epoch = 5
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             self.optimizer,
             T_0=restart_epoch*(num_samples//conf.batch_size),
