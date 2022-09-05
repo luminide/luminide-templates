@@ -58,6 +58,12 @@
             "description": "Track healthy organs in medical scans to improve cancer treatment",
             "directory": "smp-kaggle-gi-tract",
             "tags": [ "SMP", "Computer Vision", "Segmentation" ]
+        },
+        {
+            "name": "Image Generation",
+            "description": "Image Generation with Stable Diffusion",
+            "directory": "stable-diffusion",
+            "tags": [ "Computer Vision" ]
         }
     ]
 }

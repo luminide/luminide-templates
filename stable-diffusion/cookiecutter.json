@@ -1,0 +1,6 @@
+{
+   "project_description": "Stable Diffusion",
+   "num_frames": 10,
+   "frame_height": 576,
+   "frame_width": 704
+}
