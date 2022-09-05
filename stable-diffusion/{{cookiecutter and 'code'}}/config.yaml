@@ -1,0 +1,22 @@
+# prompt for the first frame of the animation
+begin_prompt: "bladerunneresque cityscape, child's crayon doodle"
+# prompt for the last frame of the animation
+end_prompt: "bladerunneresque cityscape, award winning photorealism, cinematic composition, trending on artstation, featured on pixiv, 8k, matte painting, unreal engine 5, epic lighting, masterpiece, in sharp focus, vivid colors"
+
+seed: 1
+# use higher guidance scale to generate images that are closely linked to the prompt
+# (image quality might suffer)
+guidance_scale: 7.5
+# number of denoising steps
+num_inference_steps: 40
+eta: 0
+
+# number of frames to generate using stable diffusion
+num_frames: 10
+frame_height: 576
+frame_width: 704
+# frame duration in milliseconds
+frame_duration: 50
+# this specifies how many interpolated frames to insert (recursively)
+# using pretrained film_net model
+interp_recursion: 2
