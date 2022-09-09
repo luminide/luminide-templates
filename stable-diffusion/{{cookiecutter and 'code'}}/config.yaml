@@ -12,9 +12,9 @@ num_inference_steps: 40
 eta: 0
 
 # number of frames to generate using stable diffusion
-num_frames: 10
-frame_height: 576
-frame_width: 704
+num_frames: {{ cookiecutter.num_frames }}
+frame_height: {{ cookiecutter.frame_height }}
+frame_width: {{ cookiecutter.frame_width }}
 # frame duration in milliseconds
 frame_duration: 50
 # this specifies how many interpolated frames to insert (recursively)
