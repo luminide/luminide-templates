@@ -14,7 +14,6 @@ class AnimationPipeline(StableDiffusionPipeline):
     @torch.no_grad()
     def create_text_embeddings(self, prompts):
         self.text_embeddings_list = []
-        batch_size = 1
         for i, prompt in enumerate(prompts):
             # get prompt text embeddings
             text_input = self.tokenizer(
@@ -27,7 +26,7 @@ class AnimationPipeline(StableDiffusionPipeline):
             # get unconditional embeddings for classifier free guidance
             max_length = text_input.input_ids.shape[-1]
             uncond_input = self.tokenizer(
-                [""] * batch_size, padding="max_length",
+                [""], padding="max_length",
                 max_length=max_length, return_tensors="pt")
             uncond_embeddings = self.text_encoder(
                 uncond_input.input_ids.to(self.device))[0]
@@ -40,42 +39,31 @@ class AnimationPipeline(StableDiffusionPipeline):
         lerp_weight: float,
         num_inference_steps: int,
         guidance_scale: float,
-        eta: Optional[float] = 0.0,
         height: Optional[int] = 576,
         width: Optional[int] = 704,
         generator: Optional[torch.Generator] = None,
         output_type: Optional[str] = "pil",
     ):
-        batch_size = 1
-
         # set timesteps
-        accepts_offset = "offset" in set(inspect.signature(self.scheduler.set_timesteps).parameters.keys())
         extra_set_kwargs = {}
-        offset = 0
-        if accepts_offset:
-            offset = 1
-            extra_set_kwargs["offset"] = 1
-
+        offset = 1
+        extra_set_kwargs["offset"] = 1
         self.scheduler.set_timesteps(num_inference_steps, **extra_set_kwargs)
 
         # get the original timestep using init_timestep
         init_timestep = num_inference_steps + offset
         init_timestep = min(init_timestep, num_inference_steps)
         timesteps = self.scheduler.timesteps[-init_timestep]
+        #import ipdb;ipdb.set_trace()
         timesteps = torch.tensor(
-            [timesteps] * batch_size, dtype=torch.long, device=self.device)
+            [timesteps], dtype=torch.long, device=self.device)
 
         # get weighted average of text embeddings
         text_embeddings = (
             (1 - lerp_weight) * self.text_embeddings_list[0] +
             lerp_weight * self.text_embeddings_list[1])
 
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-        extra_step_kwargs = {}
-        if accepts_eta:
-            extra_step_kwargs["eta"] = eta
-
-        latents_shape = (batch_size, self.unet.in_channels, height // 8, width // 8)
+        latents_shape = (1, self.unet.in_channels, height // 8, width // 8)
         latents = torch.randn(
             latents_shape, generator=generator, device=self.device)
         t_start = max(num_inference_steps - init_timestep + offset, 0)
@@ -94,8 +82,7 @@ class AnimationPipeline(StableDiffusionPipeline):
                 noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(
-                noise_pred, t, latents, **extra_step_kwargs)["prev_sample"]
+            latents = self.scheduler.step(noise_pred, t, latents)["prev_sample"]
 
         # scale and decode the image latents with vae
         image = self.vae.decode(1 / 0.18215 * latents)
@@ -114,12 +101,13 @@ class StableDiffusionEngine:
             beta_schedule="scaled_linear"):
         self.conf = conf
         self.device = "cuda"
+
         scheduler = PNDMScheduler(
             beta_start=beta_start, beta_end=beta_end,
             beta_schedule=beta_schedule, skip_prk_steps=True, tensor_format="np")
         model_id_or_path = "CompVis/stable-diffusion-v1-4"
         pipe = AnimationPipeline.from_pretrained(
-            model_id_or_path, schedler=scheduler, revision="fp16",
+            model_id_or_path, scheduler=scheduler, revision="fp16",
             torch_dtype=torch.float16, use_auth_token=True)
         self.pipe = pipe.to(self.device)
         with autocast("cuda"):
@@ -131,7 +119,7 @@ class StableDiffusionEngine:
             image = self.pipe(
                 lerp_weight=lerp_weight,
                 num_inference_steps=self.conf.num_inference_steps,
-                guidance_scale=self.conf.guidance_scale, eta=self.conf.eta,
+                guidance_scale=self.conf.guidance_scale,
                 height=self.conf.frame_height, width=self.conf.frame_width,
                 generator=generator)
         return image
