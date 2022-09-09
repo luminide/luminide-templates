@@ -2,7 +2,7 @@
 
 sudo apt -qq update
 sudo apt -qq install git
-pip3 install -q diffusers transformers ftfy gdown
+pip3 install -q diffusers transformers ftfy gdown av
 
 [[ ! -f ~/.huggingface/token ]]  && { huggingface-cli login; }
 
