@@ -6,13 +6,13 @@ dropout_rate: 0.5
 # resize images to this size on the fly
 image_size: {{ cookiecutter.image_size }}
 # crop to this fraction of image_size
-crop_size: 0.8
+crop_size: 1.0
 
 # optimizer settings
-optim: sgd
+optim: adam
 lr: 0.001
 weight_decay: 0.01
-batch_size: 32
+batch_size: 2
 
 # scheduler settings
 gamma: 0.96

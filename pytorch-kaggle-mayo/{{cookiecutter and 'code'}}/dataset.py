@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 import torch.utils.data as data
 
@@ -34,21 +35,27 @@ class VisionDataset(data.Dataset):
     def __getitem__(self, index):
         conf = self.conf
         filename = self.files[index]
-        assert os.path.isfile(filename)
-        img = cv2.imread(filename)
+        imgs = []
+        for i in range(16):
+            path = f'{filename}_{i}.jpg'
+            assert os.path.isfile(path)
+            img = cv2.imread(path)
 {%- if cookiecutter.augmentation == "True" %}
-        img = cv2.resize(
-            img, (conf.image_size, conf.image_size),
-            interpolation=cv2.INTER_AREA)
+            img = cv2.resize(
+                img, (conf.image_size, conf.image_size),
+                interpolation=cv2.INTER_AREA)
 {%- elif cookiecutter.augmentation == "False" %}
-        crop_size = round(conf.image_size*conf.crop_size)
-        img = cv2.resize(img, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
+            crop_size = round(conf.image_size*conf.crop_size)
+            img = cv2.resize(img, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
 {%- endif %}
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if self.transform:
-            img = self.transform(image=img)['image']
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            if self.transform:
+                img = self.transform(image=img)['image']
+            imgs.append(img)
+
+        img_stack = torch.stack(imgs, dim=0)
         label = self.labels[index]
-        return img, label
+        return img_stack, label
 
     def __len__(self):
         return len(self.files)

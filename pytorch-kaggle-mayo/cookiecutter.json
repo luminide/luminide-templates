@@ -4,8 +4,8 @@
     "train_image_dir": "train_images",
     "image_column": "image_id",
     "label_column": "label",
-    "image_size": 64,
-    "data_subset_percentage": 50,
+    "image_size": 1024,
+    "data_subset_percentage": 100,
     "augmentation": ["True", "False"],
     "AMP": ["True", "False"]
 }
