@@ -2,6 +2,9 @@
 arch: resnet18
 pretrained: true
 dropout_rate: 0.5
+# sl for supervised, ssl for self-supervised
+mode: ssl
+ssl_num_classes: 8
 
 # resize images to this size on the fly
 image_size: {{ cookiecutter.image_size }}
@@ -14,6 +17,7 @@ lr: 0.001
 weight_decay: 0.01
 batch_size: 2
 
+num_patches: 16
 # scheduler settings
 gamma: 0.96
 

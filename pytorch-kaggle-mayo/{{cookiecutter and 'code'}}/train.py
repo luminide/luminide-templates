@@ -1,6 +1,7 @@
 import os
 import argparse
 import random
+import cv2
 import multiprocessing as mp
 from datetime import datetime
 import numpy as np
@@ -14,12 +15,12 @@ from torch import nn
 import torch.utils.data as data
 {%- if cookiecutter.AMP == "True" %}
 from torch import autocast
-from torch.cuda.amp import GradScaler 
+from torch.cuda.amp import GradScaler
 {%- endif %}
 
 from augment import make_train_augmenter
 from dataset import VisionDataset
-from models import ModelWrapper
+from models import ModelWrapper, SelfSupervisedModel
 from config import Config
 from util import LossHistory, get_class_names, make_test_augmenter
 
@@ -50,6 +51,13 @@ parser.add_argument(
 device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = torch.device(device_type)
 
+def denorm(img):
+    img -= img.min()
+    maxval = img.max()
+    if maxval != 0:
+        img /= maxval
+    return np.uint8((img*255).round())
+
 class Trainer:
     def __init__(
             self, conf, input_dir, device, num_workers,
@@ -67,7 +75,10 @@ class Trainer:
 
         self.create_dataloaders(num_workers, subset)
 
-        self.model = ModelWrapper(conf, self.num_classes)
+        if conf.mode == 'ssl':
+            self.model = SelfSupervisedModel(conf, self.num_classes)
+        else:
+            self.model = ModelWrapper(conf, self.num_classes)
         self.model = self.model.to(device)
         self.optimizer = self.create_optimizer(conf, self.model)
         assert  self.optimizer is not None, f'Unknown optimizer {conf.optim}'
@@ -139,7 +150,11 @@ class Trainer:
         for epoch in range(epochs):
             # train for one epoch
             print(f'Epoch {epoch}:')
-            train_loss = self.train_epoch(epoch)
+            if self.conf.mode == 'ssl':
+                train_loss = self.ssl_train_epoch(epoch)
+                continue
+            else:
+                train_loss = self.train_epoch(epoch)
             val_loss, val_score = self.validate()
             self.scheduler.step()
             writer.add_scalar('Training loss', train_loss, epoch)
@@ -168,6 +183,78 @@ class Trainer:
 
             self.history.save()
         writer.close()
+
+    def get_ssl_labels(self, outputs):
+        # softmax so that the probabilities add up to 1.
+        sm = torch.nn.Softmax(dim=1)
+        probs = sm(outputs).cpu().detach().numpy()
+
+        # roll a die weighted with the probabilities predicted for each alphabet
+        # (the die has num_classes faces)
+        #item_probs = np.exp(item_probs)/np.sum(np.exp(item_probs))
+        labels = torch.zeros_like(outputs)
+        for idx, item_probs in enumerate(probs):
+            # TODO: use torch.randperm?
+            # instead of hard labels, just exaggerate the predictions
+            val = int(np.random.choice(range(self.conf.ssl_num_classes), p=item_probs))
+            labels[idx, val] = 1
+        return labels
+
+    def save_examples(self, epoch, images):
+        conf = self.conf
+        model = self.model
+        images = images.cpu().detach().numpy()
+        masks = model.masks.cpu().detach().numpy()
+        masked_input = model.masked_input.cpu().detach().numpy()
+        for i, _ in enumerate(images):
+            for c in range(3):
+                img = denorm(images[i, c])
+                cv2.imwrite(f'input{i}_c{c}_e{epoch}.png', img)
+            for c in range(8):
+                msk = denorm(masks[i, 0, c])
+                cv2.imwrite(f'mask{i}_c{c}_e{epoch}.png', msk)
+            for c in range(24):
+                msk_input = denorm(masked_input[i, c])
+                cv2.imwrite(f'masked_input{i}_c{c}_e{epoch}.png', msk_input)
+
+    def ssl_train_epoch(self, epoch):
+        loss_func = nn.BCEWithLogitsLoss()
+        model = self.model
+        optimizer = self.optimizer
+
+        if False and epoch == 0:
+            print('freezing the classifier')
+            model.freeze_classifier()
+        elif False and epoch == 2:
+            print('unfreezing the classifier')
+            model.unfreeze_classifier()
+        train_loss_list = []
+        model.train()
+        for step, (images, labels) in enumerate(self.train_loader):
+            images = images.to(device)
+            with autocast(device_type, enabled=self.use_amp):
+                outputs = model(images)
+                labels = self.get_ssl_labels(outputs)
+                #labels = labels.to(device)
+                loss = loss_func(outputs, labels)
+
+            train_loss_list.append(loss.item())
+            if (step + 1) % self.print_interval == 0:
+                print(f'Batch {step + 1}: training loss {loss.item():.5f}')
+            # compute gradient and do SGD step
+            if self.use_amp:
+                self.scaler.scale(loss).backward()
+                self.scaler.step(optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
+            optimizer.zero_grad()
+            if step == len(self.train_loader) - 1:
+                self.save_examples(epoch, images)
+
+        mean_train_loss = np.array(train_loss_list).mean()
+        return mean_train_loss
 
     def train_epoch(self, epoch):
         loss_func = nn.BCEWithLogitsLoss()

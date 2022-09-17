@@ -1,5 +1,6 @@
 import torch.nn as nn
 import timm
+from timm.models.resnet import Bottleneck, make_blocks, downsample_conv
 
 
 # adapted from https://www.kaggle.com/code/analokamus/a-sample-of-multi-instance-learning-model/notebook
@@ -17,7 +18,7 @@ class ModelWrapper(nn.Module):
 
     def __init__(self, conf, num_classes):
         super().__init__()
-        self.num_instances = 16
+        self.num_instances = conf.num_patches
         self.encoder = timm.create_model(
             conf.arch, conf.pretrained,
             num_classes=num_classes, drop_rate=conf.dropout_rate)
@@ -42,3 +43,69 @@ class ModelWrapper(nn.Module):
         x = self.head(x)
 
         return  x
+
+class SelfSupervisedModel(nn.Module):
+
+    def __init__(self, conf, num_classes):
+        super().__init__()
+        enc_arch = 'resnet18'
+        self.encoder = timm.create_model(
+            enc_arch, True,
+            num_classes=conf.ssl_num_classes)
+        #self.encoder_head = make_blocks(
+        #    block_fn=Bottleneck,
+        #    channels=[conf.ssl_num_classes], block_repeats=[1], inplanes=64)[0][0]
+
+        in_channels =  self.encoder.layer4[0].conv2.out_channels
+        self.encoder_head = self.make_layer(
+            Bottleneck, in_channels, conf.ssl_num_classes, stride=1)
+        #self.encoder.add_module(self.encoder_head)
+        feature_dim = self.encoder.get_classifier().in_features
+        self.classifier = timm.create_model(
+            conf.arch, conf.pretrained,
+            num_classes=conf.ssl_num_classes,
+            in_chans=3*conf.ssl_num_classes,
+            drop_rate=conf.dropout_rate)
+        self.upsample = nn.Upsample(size=(conf.image_size, conf.image_size))
+        self.save = False
+
+    def make_layer(self, block, inplanes, planes, stride):
+        assert planes % Bottleneck.expansion == 0
+        downsample = downsample_conv(inplanes, planes, 1)
+        return block(inplanes, planes // Bottleneck.expansion, stride, downsample)
+
+    def freeze_classifier(self):
+        self.classifier.requires_grad_(False)
+
+    def unfreeze_classifier(self):
+        self.classifier.requires_grad_(True)
+
+    def encode(self, x):
+        x = self.encoder.conv1(x)
+        x = self.encoder.bn1(x)
+        x = self.encoder.act1(x)
+        x = self.encoder.maxpool(x)
+
+        x = self.encoder.layer1(x)
+        x = self.encoder.layer2(x)
+        x = self.encoder.layer3(x)
+        x = self.encoder.layer4(x)
+        x = self.encoder_head(x)
+        return x
+
+    def forward(self, inputs):
+        masks = self.encode(inputs)
+        masks = self.upsample(masks)
+        masks =  masks.unsqueeze(1)
+        inputs = inputs.unsqueeze(2)
+        #masks *= masks
+        prod = masks * inputs
+        masked_input = prod.view(
+            prod.shape[0], prod.shape[1]*prod.shape[2], prod.shape[3], prod.shape[4])
+        # TODO concatenate masked_input with masks before feeding it to the classifier
+        outputs = self.classifier(masked_input)
+
+        # TODO: remove this
+        self.masks = masks
+        self.masked_input = masked_input
+        return outputs
