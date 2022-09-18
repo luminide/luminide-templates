@@ -1,6 +1,7 @@
 import torch.nn as nn
 import timm
-from timm.models.resnet import Bottleneck, make_blocks, downsample_conv
+from timm.models.resnet import (
+    BasicBlock, Bottleneck, make_blocks, drop_blocks, downsample_conv, downsample_avg)
 
 
 # adapted from https://www.kaggle.com/code/analokamus/a-sample-of-multi-instance-learning-model/notebook
@@ -48,18 +49,9 @@ class SelfSupervisedModel(nn.Module):
 
     def __init__(self, conf, num_classes):
         super().__init__()
-        enc_arch = 'resnet18'
-        self.encoder = timm.create_model(
-            enc_arch, True,
-            num_classes=conf.ssl_num_classes)
-        #self.encoder_head = make_blocks(
-        #    block_fn=Bottleneck,
-        #    channels=[conf.ssl_num_classes], block_repeats=[1], inplanes=64)[0][0]
+        self.conf = conf
+        self.create_encoder()
 
-        in_channels =  self.encoder.layer4[0].conv2.out_channels
-        self.encoder_head = self.make_layer(
-            Bottleneck, in_channels, conf.ssl_num_classes, stride=1)
-        #self.encoder.add_module(self.encoder_head)
         feature_dim = self.encoder.get_classifier().in_features
         self.classifier = timm.create_model(
             conf.arch, conf.pretrained,
@@ -69,13 +61,30 @@ class SelfSupervisedModel(nn.Module):
         self.upsample = nn.Upsample(size=(conf.image_size, conf.image_size))
         self.save = False
 
+    def create_encoder(self):
+        enc_arch = 'resnet18'
+        self.encoder = timm.create_model(
+            enc_arch, True,
+            num_classes=self.conf.ssl_num_classes)
+
+        # change the strides on layers 2, 3 and 4 from 2 to 1
+        layers = []
+        for layer in [self.encoder.layer2, self.encoder.layer3, self.encoder.layer4]:
+            stage_modules, _ = make_blocks(
+                BasicBlock, [layer[0].conv2.out_channels], [2],
+                layer[0].conv1.in_channels)
+            layers.append(stage_modules[0][1])
+        self.encoder.layer2 = layers[0]
+        self.encoder.layer3 = layers[1]
+        self.encoder.layer4 = layers[2]
+
+        stage_modules, _ = make_blocks(
+            BasicBlock, [self.conf.ssl_num_classes], [2],
+            self.encoder.layer4[0].conv2.out_channels)
+        self.encoder.head = stage_modules[0][1]
+
     def make_head(self, inplanes, planes):
         pass
-
-    def make_layer(self, block, inplanes, planes, stride):
-        assert planes % Bottleneck.expansion == 0
-        downsample = downsample_conv(inplanes, planes, 1)
-        return block(inplanes, planes // Bottleneck.expansion, stride, downsample)
 
     def freeze_classifier(self):
         self.classifier.requires_grad_(False)
@@ -93,13 +102,12 @@ class SelfSupervisedModel(nn.Module):
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
         x = self.encoder.act1(x)
-        x = self.encoder.maxpool(x)
 
         x = self.encoder.layer1(x)
         x = self.encoder.layer2(x)
         x = self.encoder.layer3(x)
         x = self.encoder.layer4(x)
-        x = self.encoder_head(x)
+        x = self.encoder.head(x)
         return x
 
     def forward(self, inputs):
