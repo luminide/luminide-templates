@@ -51,6 +51,10 @@ parser.add_argument(
 device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = torch.device(device_type)
 
+
+def to_hwc(img):
+    return img.transpose(1, 2, 0)
+
 def denorm(img):
     img -= img.min()
     maxval = img.max()
@@ -152,10 +156,10 @@ class Trainer:
             print(f'Epoch {epoch}:')
             if self.conf.mode == 'ssl':
                 train_loss = self.ssl_train_epoch(epoch)
-                continue
+                val_loss, val_score = self.ssl_validate()
             else:
                 train_loss = self.train_epoch(epoch)
-            val_loss, val_score = self.validate()
+                val_loss, val_score = self.validate()
             self.scheduler.step()
             writer.add_scalar('Training loss', train_loss, epoch)
             writer.add_scalar('Validation loss', val_loss, epoch)
@@ -185,19 +189,25 @@ class Trainer:
         writer.close()
 
     def get_ssl_labels(self, outputs):
-        # softmax so that the probabilities add up to 1.
-        sm = torch.nn.Softmax(dim=1)
-        probs = sm(outputs).cpu().detach().numpy()
-
-        # roll a die weighted with the probabilities predicted for each alphabet
-        # (the die has num_classes faces)
-        #item_probs = np.exp(item_probs)/np.sum(np.exp(item_probs))
         labels = torch.zeros_like(outputs)
-        for idx, item_probs in enumerate(probs):
-            # TODO: use torch.randperm?
-            # instead of hard labels, just exaggerate the predictions
-            val = int(np.random.choice(range(self.conf.ssl_num_classes), p=item_probs))
-            labels[idx, val] = 1
+        if False:
+            # softmax so that the probabilities add up to 1.
+            sm = torch.nn.Softmax(dim=1)
+            probs = sm(outputs).cpu().detach().numpy()
+
+            # roll a die weighted with the probabilities predicted for each alphabet
+            # (the die has num_classes faces)
+            #item_probs = np.exp(item_probs)/np.sum(np.exp(item_probs))
+            for idx, item_probs in enumerate(probs):
+                # TODO: use torch.randperm?
+                # instead of hard labels, just exaggerate the predictions
+                val = int(np.random.choice(range(self.conf.ssl_num_classes), p=item_probs))
+                labels[idx, val] = 1
+        num_classes = self.conf.ssl_num_classes
+        assert labels.shape[0] % num_classes == 0
+
+        for i in range(labels.shape[0] // num_classes):
+            labels[range(i * num_classes, num_classes * (i + 1)), range(num_classes)] = 1
         return labels
 
     def save_examples(self, epoch, images):
@@ -206,15 +216,14 @@ class Trainer:
         images = images.cpu().detach().numpy()
         masks = model.masks.cpu().detach().numpy()
         masked_input = model.masked_input.cpu().detach().numpy()
+        num_classes = self.conf.ssl_num_classes
         for i, _ in enumerate(images):
-            for c in range(3):
-                img = denorm(images[i, c])
-                cv2.imwrite(f'input{i}_c{c}_e{epoch}.png', img)
-            for c in range(8):
-                msk = denorm(masks[i, 0, c])
+            img = denorm(to_hwc(images[i]))
+            cv2.imwrite(f'input{i}_e{epoch}.png', img)
+            for c in range(num_classes):
+                msk = denorm(masks[i, c, 0])
                 cv2.imwrite(f'mask{i}_c{c}_e{epoch}.png', msk)
-            for c in range(24):
-                msk_input = denorm(masked_input[i, c])
+                msk_input = denorm(to_hwc(masked_input[i*num_classes + c]))
                 cv2.imwrite(f'masked_input{i}_c{c}_e{epoch}.png', msk_input)
 
     def ssl_train_epoch(self, epoch):
@@ -222,12 +231,15 @@ class Trainer:
         model = self.model
         optimizer = self.optimizer
 
-        if False and epoch == 0:
+        if epoch % 2 == 0:
             print('freezing the classifier')
             model.freeze_classifier()
-        elif False and epoch == 2:
+            model.unfreeze_encoder()
+        #elif True and epoch == 3:
+        else:
             print('unfreezing the classifier')
             model.unfreeze_classifier()
+            model.freeze_encoder()
         train_loss_list = []
         model.train()
         for step, (images, labels) in enumerate(self.train_loader):
@@ -235,7 +247,6 @@ class Trainer:
             with autocast(device_type, enabled=self.use_amp):
                 outputs = model(images)
                 labels = self.get_ssl_labels(outputs)
-                #labels = labels.to(device)
                 loss = loss_func(outputs, labels)
 
             train_loss_list.append(loss.item())
@@ -323,6 +334,35 @@ class Trainer:
 
         mean_train_loss = np.array(train_loss_list).mean()
         return mean_train_loss
+
+    def ssl_validate(self):
+        loss_func = nn.BCEWithLogitsLoss()
+        sigmoid = nn.Sigmoid()
+        losses = []
+        num_classes = self.conf.ssl_num_classes
+        all_labels = np.zeros(
+            (len(self.val_loader.dataset) * num_classes, num_classes), dtype=np.float32)
+        preds = np.zeros_like(all_labels)
+        start_idx = 0
+        self.model.eval()
+        with torch.no_grad():
+            for images, labels in self.val_loader:
+                images = images.to(device)
+                #labels = labels.to(device)
+                with autocast(device_type, enabled=self.use_amp):
+                    outputs = self.model(images)
+                labels = self.get_ssl_labels(outputs)
+                end_idx = start_idx + outputs.shape[0]
+                all_labels[start_idx:end_idx] = labels.cpu().numpy()
+                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+                start_idx = end_idx
+                losses.append(loss_func(outputs, labels).item())
+
+        if np.isfinite(preds).all():
+            score = f1_score(all_labels, preds, average='micro')
+        else:
+            score = np.nan
+        return np.mean(losses), score
 
     def validate(self):
         loss_func = nn.BCEWithLogitsLoss()

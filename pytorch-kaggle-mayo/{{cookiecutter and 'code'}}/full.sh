@@ -8,6 +8,9 @@
 #  - This script will be run from your output directory
 #  - Imported Data is accessible via the relative path ../input/
 
+set +x
+rm *.png
+set -x
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
 /usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60

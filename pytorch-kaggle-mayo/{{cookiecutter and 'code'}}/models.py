@@ -64,10 +64,13 @@ class SelfSupervisedModel(nn.Module):
         self.classifier = timm.create_model(
             conf.arch, conf.pretrained,
             num_classes=conf.ssl_num_classes,
-            in_chans=3*conf.ssl_num_classes,
+            in_chans=3,
             drop_rate=conf.dropout_rate)
         self.upsample = nn.Upsample(size=(conf.image_size, conf.image_size))
         self.save = False
+
+    def make_head(self, inplanes, planes):
+        pass
 
     def make_layer(self, block, inplanes, planes, stride):
         assert planes % Bottleneck.expansion == 0
@@ -79,6 +82,12 @@ class SelfSupervisedModel(nn.Module):
 
     def unfreeze_classifier(self):
         self.classifier.requires_grad_(True)
+
+    def freeze_encoder(self):
+        self.encoder.requires_grad_(False)
+
+    def unfreeze_encoder(self):
+        self.encoder.requires_grad_(True)
 
     def encode(self, x):
         x = self.encoder.conv1(x)
@@ -96,12 +105,13 @@ class SelfSupervisedModel(nn.Module):
     def forward(self, inputs):
         masks = self.encode(inputs)
         masks = self.upsample(masks)
-        masks =  masks.unsqueeze(1)
-        inputs = inputs.unsqueeze(2)
+        inputs = inputs.unsqueeze(1)
+        masks =  masks.unsqueeze(2)
         #masks *= masks
         prod = masks * inputs
+        # at this point, the shape of the data is NMCHW, where M is the number of SSL classes
         masked_input = prod.view(
-            prod.shape[0], prod.shape[1]*prod.shape[2], prod.shape[3], prod.shape[4])
+            prod.shape[0] * prod.shape[1], prod.shape[2], prod.shape[3], prod.shape[4])
         # TODO concatenate masked_input with masks before feeding it to the classifier
         outputs = self.classifier(masked_input)
 
