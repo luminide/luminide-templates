@@ -45,6 +45,26 @@ class ModelWrapper(nn.Module):
 
         return  x
 
+class EncoderHead(nn.Module):
+
+    def __init__(self, conf, num_classes, in_channels):
+        super().__init__()
+        layers = []
+        for out_channels in [128, 32, 8]:
+            stage_modules, _ = make_blocks(
+                BasicBlock, [out_channels], [2], in_channels)
+            in_channels = out_channels
+            layers.append(stage_modules[0][1])
+        self.layer1 = layers[0]
+        self.layer2 = layers[1]
+        self.layer3 = layers[2]
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        return x
+
 class SelfSupervisedModel(nn.Module):
 
     def __init__(self, conf, num_classes):
@@ -78,12 +98,15 @@ class SelfSupervisedModel(nn.Module):
         self.encoder.layer3 = layers[1]
         self.encoder.layer4 = layers[2]
 
+        self.encoder.head = EncoderHead(
+            self.conf, self.conf.ssl_num_classes,
+            self.encoder.layer4[0].conv2.out_channels)
+
+    def make_head(self):
         stage_modules, _ = make_blocks(
             BasicBlock, [self.conf.ssl_num_classes], [2],
             self.encoder.layer4[0].conv2.out_channels)
         self.encoder.head = stage_modules[0][1]
-
-    def make_head(self, inplanes, planes):
         pass
 
     def freeze_classifier(self):
@@ -99,14 +122,7 @@ class SelfSupervisedModel(nn.Module):
         self.encoder.requires_grad_(True)
 
     def encode(self, x):
-        x = self.encoder.conv1(x)
-        x = self.encoder.bn1(x)
-        x = self.encoder.act1(x)
-
-        x = self.encoder.layer1(x)
-        x = self.encoder.layer2(x)
-        x = self.encoder.layer3(x)
-        x = self.encoder.layer4(x)
+        x = self.encoder.forward_features(x)
         x = self.encoder.head(x)
         return x
 
