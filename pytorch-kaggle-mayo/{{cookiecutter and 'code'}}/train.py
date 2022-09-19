@@ -231,15 +231,15 @@ class Trainer:
         model = self.model
         optimizer = self.optimizer
 
-        if epoch % 2 == 0:
-            print('freezing the classifier')
-            model.freeze_classifier()
-            model.unfreeze_encoder()
-        #elif True and epoch == 3:
-        else:
+        if epoch % 9 == 0:
             print('unfreezing the classifier')
             model.unfreeze_classifier()
             model.freeze_encoder()
+        else:
+            print('freezing the classifier')
+            model.freeze_classifier()
+            model.unfreeze_encoder()
+
         train_loss_list = []
         model.train()
         for step, (images, labels) in enumerate(self.train_loader):
@@ -248,6 +248,13 @@ class Trainer:
                 outputs = model(images)
                 labels = self.get_ssl_labels(outputs)
                 loss = loss_func(outputs, labels)
+                # the masks are in NMCHW format, where M is the number of masks
+                loss += 10000 * torch.prod(self.model.masks, axis=1).mean()
+                norm = ((self.model.masks)**2).mean()
+                sum_val = torch.sum(self.model.masks, axis=1).mean()
+                loss -= sum_val
+                loss += norm
+                #print(f'norm {norm:.5f} max {self.model.masks.max():.2f} sum {sum_val:.2f}')
 
             train_loss_list.append(loss.item())
             if (step + 1) % self.print_interval == 0:
