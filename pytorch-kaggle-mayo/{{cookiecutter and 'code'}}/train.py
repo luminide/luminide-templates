@@ -69,7 +69,7 @@ class Trainer:
         self.conf = conf
         self.input_dir = input_dir
         self.device = device
-        self.max_patience = 10
+        self.max_patience = 100
         self.print_interval = print_interval
 {%- if cookiecutter.AMP == "True" %}
         self.use_amp = torch.cuda.is_available()
@@ -231,16 +231,21 @@ class Trainer:
         model = self.model
         optimizer = self.optimizer
 
-        if epoch % 9 == 0:
+        #if epoch != 0 and epoch % 9 == 0:
+        if False:
             print('unfreezing the classifier')
             model.unfreeze_classifier()
             model.freeze_encoder()
-        else:
+        #else:
+        if False:
             print('freezing the classifier')
             model.freeze_classifier()
             model.unfreeze_encoder()
 
         train_loss_list = []
+        plain_loss_list = []
+        sum_diff_list = []
+        prod_diff_list = []
         model.train()
         for step, (images, labels) in enumerate(self.train_loader):
             images = images.to(device)
@@ -248,13 +253,36 @@ class Trainer:
                 outputs = model(images)
                 labels = self.get_ssl_labels(outputs)
                 loss = loss_func(outputs, labels)
-                # the masks are in NMCHW format, where M is the number of masks
-                loss += 10000 * torch.prod(self.model.masks, axis=1).mean()
-                norm = ((self.model.masks)**2).mean()
-                sum_val = torch.sum(self.model.masks, axis=1).mean()
-                loss -= sum_val
-                loss += norm
+                # the masks are in NMCHW format, where M is the number of masks and C = 1
+
+                #import ipdb;ipdb.set_trace()
+                if False:
+                    loss += 10000*torch.prod(self.model.masks, axis=1).mean()
+                    norm = ((self.model.masks)**2).mean()
+                    sum_val = torch.sum(self.model.masks, axis=1).mean()
+                    loss -= sum_val
+                    loss += norm
+                else:
+                    # constrain the sum of all mask pixels to be 1
+                    mask_sums = torch.sum(self.model.masks, axis=1)
+                    diff = mask_sums - 1
+                    sum_diff = (diff*diff).mean()
+                    M = self.model.masks.shape[1]
+                    prod_diff = 0
+                    # encourage the product of any 2 masks to be zero
+                    for i in range(M):
+                        for j in range(i + 1, M):
+                            assert i != j
+                            mask_prods = self.model.masks[:, i] * self.model.masks[:, j]
+                            prod_diff += (mask_prods*mask_prods).mean()
                 #print(f'norm {norm:.5f} max {self.model.masks.max():.2f} sum {sum_val:.2f}')
+
+            plain_loss_list.append(loss.item())
+            sum_diff_list.append(sum_diff.item())
+            prod_diff_list.append(prod_diff.item())
+
+            loss += sum_diff
+            loss += prod_diff
 
             train_loss_list.append(loss.item())
             if (step + 1) % self.print_interval == 0:
@@ -271,7 +299,11 @@ class Trainer:
             if step == len(self.train_loader) - 1:
                 self.save_examples(epoch, images)
 
+        mean_loss =  np.array(plain_loss_list).mean()
+        mean_sum_diff =  np.array(sum_diff_list).mean()
+        mean_prod_diff =  np.array(prod_diff_list).mean()
         mean_train_loss = np.array(train_loss_list).mean()
+        print(f'plain loss {mean_loss:.4f} sum_diff {mean_sum_diff:.4f} prod_diff {mean_prod_diff:.4f} all {mean_train_loss:.4f} ')
         return mean_train_loss
 
     def train_epoch(self, epoch):

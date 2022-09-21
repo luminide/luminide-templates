@@ -131,11 +131,13 @@ class SelfSupervisedModel(nn.Module):
         masks = self.upsample(masks)
         inputs = inputs.unsqueeze(1)
         masks =  masks.unsqueeze(2)
-        #masks *= masks
-        prod = masks * inputs
+        # scale masks to (0, 1)
+        N, M, C, H, W = masks.shape
+        mask_view = masks.view((N*M, C*H*W))
+        mask_view /= mask_view.max(axis=0).values
+        prod = masks*inputs
         # at this point, the shape of the data is NMCHW, where M is the number of SSL classes
-        masked_input = prod.view(
-            prod.shape[0] * prod.shape[1], prod.shape[2], prod.shape[3], prod.shape[4])
+        masked_input = prod.view(N*M, 3, H, W)
         # TODO concatenate masked_input with masks before feeding it to the classifier
         outputs = self.classifier(masked_input)
 
