@@ -244,45 +244,40 @@ class Trainer:
 
         train_loss_list = []
         plain_loss_list = []
+        bin_loss_list = []
         sum_diff_list = []
         prod_diff_list = []
         model.train()
-        for step, (images, labels) in enumerate(self.train_loader):
+        for step, (images, bin_labels) in enumerate(self.train_loader):
             images = images.to(device)
+            bin_labels = bin_labels.to(device)
             with autocast(device_type, enabled=self.use_amp):
                 outputs = model(images)
                 labels = self.get_ssl_labels(outputs)
                 loss = loss_func(outputs, labels)
+                bin_loss = loss_func(self.model.bin_outputs, bin_labels)
                 # the masks are in NMCHW format, where M is the number of masks and C = 1
-
-                #import ipdb;ipdb.set_trace()
-                if False:
-                    loss += 10000*torch.prod(self.model.masks, axis=1).mean()
-                    norm = ((self.model.masks)**2).mean()
-                    sum_val = torch.sum(self.model.masks, axis=1).mean()
-                    loss -= sum_val
-                    loss += norm
-                else:
-                    # constrain the sum of all mask pixels to be 1
-                    mask_sums = torch.sum(self.model.masks, axis=1)
-                    diff = mask_sums - 1
-                    sum_diff = (diff*diff).mean()
-                    M = self.model.masks.shape[1]
-                    prod_diff = 0
-                    # encourage the product of any 2 masks to be zero
-                    for i in range(M):
-                        for j in range(i + 1, M):
-                            assert i != j
-                            mask_prods = self.model.masks[:, i] * self.model.masks[:, j]
-                            prod_diff += (mask_prods*mask_prods).mean()
-                #print(f'norm {norm:.5f} max {self.model.masks.max():.2f} sum {sum_val:.2f}')
+                # constrain the sum of all mask pixels to be 1
+                mask_sums = torch.sum(self.model.masks, axis=1)
+                diff = mask_sums - 1
+                sum_diff = (diff*diff).mean()
+                M = self.model.masks.shape[1]
+                prod_diff = 0
+                # encourage the product of any 2 masks to be zero
+                for i in range(M):
+                    for j in range(i + 1, M):
+                        assert i != j
+                        mask_prods = self.model.masks[:, i] * self.model.masks[:, j]
+                        prod_diff += (mask_prods*mask_prods).mean()
 
             plain_loss_list.append(loss.item())
+            bin_loss_list.append(bin_loss.item())
             sum_diff_list.append(sum_diff.item())
             prod_diff_list.append(prod_diff.item())
 
             loss += sum_diff
             loss += prod_diff
+            loss += bin_loss
 
             train_loss_list.append(loss.item())
             if (step + 1) % self.print_interval == 0:
@@ -300,10 +295,11 @@ class Trainer:
                 self.save_examples(epoch, images)
 
         mean_loss =  np.array(plain_loss_list).mean()
+        mean_bin_loss =  np.array(bin_loss_list).mean()
         mean_sum_diff =  np.array(sum_diff_list).mean()
         mean_prod_diff =  np.array(prod_diff_list).mean()
         mean_train_loss = np.array(train_loss_list).mean()
-        print(f'plain loss {mean_loss:.4f} sum_diff {mean_sum_diff:.4f} prod_diff {mean_prod_diff:.4f} all {mean_train_loss:.4f} ')
+        print(f'plain loss {mean_loss:.4f} bin loss {mean_bin_loss:.4f} sum_diff {mean_sum_diff:.4f} prod_diff {mean_prod_diff:.4f} all {mean_train_loss:.4f} ')
         return mean_train_loss
 
     def train_epoch(self, epoch):
@@ -378,24 +374,25 @@ class Trainer:
         loss_func = nn.BCEWithLogitsLoss()
         sigmoid = nn.Sigmoid()
         losses = []
-        num_classes = self.conf.ssl_num_classes
+        num_classes = self.num_classes
         all_labels = np.zeros(
-            (len(self.val_loader.dataset) * num_classes, num_classes), dtype=np.float32)
+            (len(self.val_loader.dataset), num_classes), dtype=np.float32)
         preds = np.zeros_like(all_labels)
         start_idx = 0
         self.model.eval()
         with torch.no_grad():
-            for images, labels in self.val_loader:
+            for images, bin_labels in self.val_loader:
                 images = images.to(device)
-                #labels = labels.to(device)
+                bin_labels = bin_labels.to(device)
                 with autocast(device_type, enabled=self.use_amp):
                     outputs = self.model(images)
-                labels = self.get_ssl_labels(outputs)
-                end_idx = start_idx + outputs.shape[0]
-                all_labels[start_idx:end_idx] = labels.cpu().numpy()
-                preds[start_idx:end_idx] = sigmoid(outputs).round().cpu().numpy()
+                end_idx = start_idx + self.model.bin_outputs.shape[0]
+                all_labels[start_idx:end_idx] = bin_labels.cpu().numpy()
+                preds[start_idx:end_idx] = sigmoid(self.model.bin_outputs).round().cpu().numpy()
+                if np.isfinite(preds).all() == False:
+                    import ipdb;ipdb.set_trace()
                 start_idx = end_idx
-                losses.append(loss_func(outputs, labels).item())
+                losses.append(loss_func(self.model.bin_outputs, bin_labels).item())
 
         if np.isfinite(preds).all():
             score = f1_score(all_labels, preds, average='micro')

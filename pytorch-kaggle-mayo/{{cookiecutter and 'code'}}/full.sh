@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # Common packages are already installed on the compute server
 # Need an additional package? Install it here via:
@@ -13,8 +13,8 @@ rm *.png
 set -x
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 200
 {%- else %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 60 --subset {{ cookiecutter.data_subset_percentage }}
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 200 --subset {{ cookiecutter.data_subset_percentage }}
 {%- endif %}

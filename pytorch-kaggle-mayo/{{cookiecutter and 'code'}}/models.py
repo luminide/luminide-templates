@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import timm
 from timm.models.resnet import (
@@ -83,9 +84,10 @@ class SelfSupervisedModel(nn.Module):
 
     def create_encoder(self):
         enc_arch = 'resnet18'
+        ssl_num_classes = self.conf.ssl_num_classes
         self.encoder = timm.create_model(
             enc_arch, True,
-            num_classes=self.conf.ssl_num_classes)
+            num_classes=ssl_num_classes)
 
         # change the strides on layers 2, 3 and 4 from 2 to 1
         layers = []
@@ -99,8 +101,9 @@ class SelfSupervisedModel(nn.Module):
         self.encoder.layer4 = layers[2]
 
         self.encoder.head = EncoderHead(
-            self.conf, self.conf.ssl_num_classes,
+            self.conf, ssl_num_classes,
             self.encoder.layer4[0].conv2.out_channels)
+        self.bin_classifier = nn.Linear(ssl_num_classes*ssl_num_classes, 2)
 
     def make_head(self):
         stage_modules, _ = make_blocks(
@@ -134,13 +137,14 @@ class SelfSupervisedModel(nn.Module):
         # scale masks to (0, 1)
         N, M, C, H, W = masks.shape
         mask_view = masks.view((N*M, C*H*W))
-        mask_view /= mask_view.max(axis=0).values
+        mask_view /= mask_view.max(axis=0).values + 1e-6
         prod = masks*inputs
         # at this point, the shape of the data is NMCHW, where M is the number of SSL classes
         masked_input = prod.view(N*M, 3, H, W)
         # TODO concatenate masked_input with masks before feeding it to the classifier
         outputs = self.classifier(masked_input)
 
+        self.bin_outputs = self.bin_classifier(outputs.view(N, M*M))
         # TODO: remove this
         self.masks = masks
         self.masked_input = masked_input
