@@ -166,9 +166,9 @@ class Trainer:
             writer.add_scalar('Validation F1 score', val_score, epoch)
             writer.flush()
             print(f'training loss {train_loss:.5f}')
-            print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
             self.history.add_epoch_val_loss(epoch, self.sample_count, val_loss)
             if best_loss is None or val_loss < best_loss:
+                print(f'* Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
                 best_loss = val_loss
                 state = {
                     'epoch': epoch, 'model': self.model.state_dict(),
@@ -178,6 +178,7 @@ class Trainer:
                 torch.save(state, 'model.pth')
                 patience = self.max_patience
             else:
+                print(f'Validation F1 score {val_score:.4f} loss {val_loss:.4f}\n')
                 patience -= 1
                 if patience == 0:
                     print(
@@ -268,14 +269,14 @@ class Trainer:
                     for j in range(i + 1, M):
                         assert i != j
                         mask_prods = self.model.masks[:, i] * self.model.masks[:, j]
-                        prod_diff += (mask_prods*mask_prods).mean()
+                        prod_diff += mask_prods.mean()
 
             plain_loss_list.append(loss.item())
             bin_loss_list.append(bin_loss.item())
             sum_diff_list.append(sum_diff.item())
             prod_diff_list.append(prod_diff.item())
 
-            loss += sum_diff
+            #loss += sum_diff
             loss += prod_diff
             loss += bin_loss
 
@@ -299,7 +300,7 @@ class Trainer:
         mean_sum_diff =  np.array(sum_diff_list).mean()
         mean_prod_diff =  np.array(prod_diff_list).mean()
         mean_train_loss = np.array(train_loss_list).mean()
-        print(f'plain loss {mean_loss:.4f} bin loss {mean_bin_loss:.4f} sum_diff {mean_sum_diff:.4f} prod_diff {mean_prod_diff:.4f} all {mean_train_loss:.4f} ')
+        print(f'plain loss {mean_loss:.4f} bin loss {mean_bin_loss:.4f} sum_diff {mean_sum_diff:.4f} prod_diff {mean_prod_diff:.4f} all {mean_train_loss:.4f}')
         return mean_train_loss
 
     def train_epoch(self, epoch):

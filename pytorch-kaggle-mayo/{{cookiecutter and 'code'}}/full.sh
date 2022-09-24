@@ -13,8 +13,8 @@ rm *.png
 set -x
 {%- if cookiecutter.data_subset_percentage == '100' %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 200
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 120
 {%- else %}
 
-/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 200 --subset {{ cookiecutter.data_subset_percentage }}
+/usr/bin/time -f "Time taken: %E" python3 ../code/train.py --epochs 120 --subset {{ cookiecutter.data_subset_percentage }}
 {%- endif %}

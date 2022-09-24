@@ -51,7 +51,7 @@ class EncoderHead(nn.Module):
     def __init__(self, conf, num_classes, in_channels):
         super().__init__()
         layers = []
-        for out_channels in [128, 32, 8]:
+        for out_channels in [16*num_classes, 4*num_classes, num_classes]:
             stage_modules, _ = make_blocks(
                 BasicBlock, [out_channels], [2], in_channels)
             in_channels = out_channels
@@ -80,7 +80,10 @@ class SelfSupervisedModel(nn.Module):
             in_chans=3,
             drop_rate=conf.dropout_rate)
         self.upsample = nn.Upsample(size=(conf.image_size, conf.image_size))
-        self.save = False
+        if False:
+            mask_weights = torch.ones((1, self.conf.ssl_num_classes, 1, 1, 1))
+            mask_weights = nn.Parameter(mask_weights, requires_grad=True)
+            self.register_parameter('mask_weights', mask_weights)
 
     def create_encoder(self):
         enc_arch = 'resnet18'
@@ -134,6 +137,10 @@ class SelfSupervisedModel(nn.Module):
         masks = self.upsample(masks)
         inputs = inputs.unsqueeze(1)
         masks =  masks.unsqueeze(2)
+
+        # weight each mask with learned weights
+        #masks = masks*self.mask_weights*self.mask_weights
+
         # scale masks to (0, 1)
         N, M, C, H, W = masks.shape
         mask_view = masks.view((N*M, C*H*W))
