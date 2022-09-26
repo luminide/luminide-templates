@@ -37,11 +37,8 @@ class VisionDataset(data.Dataset):
         conf = self.conf
         filename = self.files[index]
         imgs = []
-        num_patches = 1 if conf.mode == 'ssl' else conf.num_patches
+        num_patches = conf.num_patches
         for i in range(num_patches):
-            if conf.mode == 'ssl':
-                # return a random patch
-                i = random.randint(0, conf.num_patches - 1)
             path = f'{filename}_{i}.jpg'
             assert os.path.isfile(path)
             img = cv2.imread(path)
@@ -59,6 +56,7 @@ class VisionDataset(data.Dataset):
             imgs.append(img)
 
         if len(imgs) > 1:
+            np.random.shuffle(imgs)
             img_stack = torch.stack(imgs, dim=0)
         else:
             img_stack = img

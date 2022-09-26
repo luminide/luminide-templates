@@ -215,8 +215,13 @@ class Trainer:
         conf = self.conf
         model = self.model
         images = images.cpu().detach().numpy()
+        N, P, C, H, W = images.shape
+        images = images.reshape((N*P, C, H, W))
         masks = model.masks.cpu().detach().numpy()
         masked_input = model.masked_input.cpu().detach().numpy()
+        # convert to RGB
+        images = images[:, ::-1]
+        masked_input = masked_input[:, ::-1]
         num_classes = self.conf.ssl_num_classes
         for i, _ in enumerate(images):
             img = denorm(to_hwc(images[i]))
@@ -390,8 +395,6 @@ class Trainer:
                 end_idx = start_idx + self.model.bin_outputs.shape[0]
                 all_labels[start_idx:end_idx] = bin_labels.cpu().numpy()
                 preds[start_idx:end_idx] = sigmoid(self.model.bin_outputs).round().cpu().numpy()
-                if np.isfinite(preds).all() == False:
-                    import ipdb;ipdb.set_trace()
                 start_idx = end_idx
                 losses.append(loss_func(self.model.bin_outputs, bin_labels).item())
 

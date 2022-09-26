@@ -85,6 +85,19 @@ class SelfSupervisedModel(nn.Module):
             mask_weights = nn.Parameter(mask_weights, requires_grad=True)
             self.register_parameter('mask_weights', mask_weights)
 
+        num_patches = self.conf.num_patches
+        num_features = 8
+        self.bin_classifier = nn.Sequential(
+            nn.Conv2d(
+                num_patches, num_features, kernel_size=3, stride=1,
+                padding=2, bias=False),
+            nn.Conv2d(
+                num_features, num_features, kernel_size=3, stride=1,
+                padding=2, bias=False),
+            nn.AdaptiveMaxPool2d(1), Flatten(),
+            nn.Linear(num_features, num_classes)
+        )
+
     def create_encoder(self):
         enc_arch = 'resnet18'
         ssl_num_classes = self.conf.ssl_num_classes
@@ -106,8 +119,6 @@ class SelfSupervisedModel(nn.Module):
         self.encoder.head = EncoderHead(
             self.conf, ssl_num_classes,
             self.encoder.layer4[0].conv2.out_channels)
-        self.bin_classifier = nn.Linear(ssl_num_classes*ssl_num_classes, 2)
-
     def make_head(self):
         stage_modules, _ = make_blocks(
             BasicBlock, [self.conf.ssl_num_classes], [2],
@@ -133,6 +144,10 @@ class SelfSupervisedModel(nn.Module):
         return x
 
     def forward(self, inputs):
+        # P is the number of patches per example
+        N, P, C, H, W = inputs.shape
+
+        inputs = inputs.view(N*P, C, H, W)
         masks = self.encode(inputs)
         masks = self.upsample(masks)
         inputs = inputs.unsqueeze(1)
@@ -142,16 +157,16 @@ class SelfSupervisedModel(nn.Module):
         #masks = masks*self.mask_weights*self.mask_weights
 
         # scale masks to (0, 1)
-        N, M, C, H, W = masks.shape
-        mask_view = masks.view((N*M, C*H*W))
+        NP, M, C, H, W = masks.shape
+        mask_view = masks.view((NP*M, C*H*W))
         mask_view /= mask_view.max(axis=0).values + 1e-6
         prod = masks*inputs
         # at this point, the shape of the data is NMCHW, where M is the number of SSL classes
-        masked_input = prod.view(N*M, 3, H, W)
+        masked_input = prod.view(NP*M, 3, H, W)
         # TODO concatenate masked_input with masks before feeding it to the classifier
         outputs = self.classifier(masked_input)
 
-        self.bin_outputs = self.bin_classifier(outputs.view(N, M*M))
+        self.bin_outputs = self.bin_classifier(outputs.view(N, P, M, M))
         # TODO: remove this
         self.masks = masks
         self.masked_input = masked_input
