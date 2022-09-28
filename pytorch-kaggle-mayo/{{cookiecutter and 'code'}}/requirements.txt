@@ -1,7 +1,1 @@
-pandas
-torchvision
-albumentations
-torch
-opencv_python
-matplotlib
-numpy
+pyvips

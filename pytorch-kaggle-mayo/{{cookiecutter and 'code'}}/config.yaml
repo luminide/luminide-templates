@@ -24,8 +24,8 @@ gamma: 0.96
 {%- if cookiecutter.augmentation == "True" %}
 
 # data augmentation
-aug_prob: 0.1
-strong_aug: false
-max_cutout: 0
+aug_prob: 0.7
+strong_aug: true
+max_cutout: 8
 
 {%- endif %}

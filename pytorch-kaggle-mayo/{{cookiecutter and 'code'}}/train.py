@@ -297,7 +297,7 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
             optimizer.zero_grad()
-            if step == len(self.train_loader) - 1:
+            if epoch % 10 == 0 and step == len(self.train_loader) - 1:
                 self.save_examples(epoch, images)
 
         mean_loss =  np.array(plain_loss_list).mean()

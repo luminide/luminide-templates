@@ -9,22 +9,19 @@ import torch.utils.data as data
 
 from util import get_class_names, make_test_augmenter
 from dataset import VisionDataset
-from models import ModelWrapper
+from models import SelfSupervisedModel
+from prep import save_dataset
 from config import Config
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running on {device}')
 
-def create_test_loader(conf, input_dir, class_names):
+
+def create_test_loader(conf, input_dir, class_names, test_df):
     test_aug = make_test_augmenter(conf)
 
     image_dir = 'test_images'
-    test_df = pd.DataFrame()
-    image_files = sorted(glob(f'{input_dir}/{image_dir}/*.*'))
-    assert len(image_files) > 0, f'No files inside {input_dir}/{image_dir}'
-    image_files = [os.path.basename(filename) for filename in image_files]
-    test_df['image'] = image_files
-    test_df['labels'] = class_names[0]
+    test_df['label'] = class_names[0]
     test_dataset = VisionDataset(
         test_df, conf, input_dir, image_dir,
         class_names, test_aug)
@@ -32,19 +29,19 @@ def create_test_loader(conf, input_dir, class_names):
     loader = data.DataLoader(
         test_dataset, batch_size=conf.batch_size, shuffle=False,
         num_workers=mp.cpu_count(), pin_memory=False)
-    return loader, test_df
+    return loader
 
 def create_model(model_dir, num_classes):
     checkpoint = torch.load(f'{model_dir}/model.pth', map_location=device)
     conf = Config(checkpoint['conf'])
     conf.pretrained = False
-    model = ModelWrapper(conf, num_classes)
+    model = SelfSupervisedModel(conf, num_classes)
     model = model.to(device)
     model.load_state_dict(checkpoint['model'])
     return model, conf
 
 def test(loader, model, num_classes):
-    sigmoid = nn.Sigmoid()
+    act = nn.Sigmoid()
     preds = np.zeros((len(loader.dataset), num_classes), dtype=np.float32)
     start_idx = 0
     model.eval()
@@ -53,25 +50,26 @@ def test(loader, model, num_classes):
             images = images.to(device)
             outputs = model(images)
             # multi-label classification:
-            # set the prediction to 1 iff sigmoid(output) >= 0.5
-            pred_batch = sigmoid(outputs).round().cpu().numpy()
+            pred_batch = act(model.bin_outputs).cpu().numpy()
             num_rows = pred_batch.shape[0]
-            # for each example, pick the label that was predicted as most likely
-            max_inds = outputs.argmax(axis=1).cpu().numpy()
-            # this is to make sure that at least one class is predicted
-            pred_batch[range(num_rows), max_inds] = 1
             end_idx = start_idx + num_rows
             preds[start_idx:end_idx] = pred_batch
             start_idx = end_idx
     return preds
 
-def save_results(df, preds, class_names):
-    pred_names = []
-    for row in preds:
-        pred_names.append(' '.join(class_names[np.where(row)]))
-    df['labels'] = pred_names
-    df.to_csv('submission.csv', index=False)
+def save_results(input_dir, df, preds, class_names):
+    subm = pd.DataFrame(columns=['patient_id', 'CE', 'LAA'])
+
+    subm['patient_id'] = df['patient_id']
+    subm['CE'] = preds[:, 0]
+    subm['LAA'] = preds[:, 1]
+
+    # group predictions according to patient IDs
+    subm = subm.groupby(['patient_id']).mean().reset_index()
+    subm.to_csv('submission.csv', index=False)
     print('Saved submission.csv')
+    sample_subm = pd.read_csv(f'{input_dir}/sample_submission.csv')
+    assert sample_subm.shape[0] == subm.shape[0]
 
 def run(input_dir, model_dir):
     meta_file = os.path.join(input_dir, '{{ cookiecutter.train_metadata }}')
@@ -80,9 +78,13 @@ def run(input_dir, model_dir):
     num_classes = len(class_names)
 
     model, conf = create_model(model_dir, num_classes)
-    loader, df = create_test_loader(conf, input_dir, class_names)
+
+    test_df = pd.read_csv(f'{input_dir}/test.csv')
+    save_dataset(test_df, image_dir=f'{input_dir}/test')
+
+    loader = create_test_loader(conf, './', class_names, test_df)
     preds = test(loader, model, num_classes)
-    save_results(df, preds, class_names)
+    save_results(input_dir, test_df, preds, class_names)
 
 if __name__ == '__main__':
     run('../input', './')

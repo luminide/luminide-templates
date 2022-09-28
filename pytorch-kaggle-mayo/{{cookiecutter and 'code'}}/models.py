@@ -102,7 +102,7 @@ class SelfSupervisedModel(nn.Module):
         enc_arch = 'resnet18'
         ssl_num_classes = self.conf.ssl_num_classes
         self.encoder = timm.create_model(
-            enc_arch, True,
+            enc_arch, self.conf.pretrained,
             num_classes=ssl_num_classes)
 
         # change the strides on layers 2, 3 and 4 from 2 to 1
