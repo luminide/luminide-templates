@@ -261,7 +261,8 @@ class Trainer:
                 outputs = model(images)
                 labels = self.get_ssl_labels(outputs)
                 loss = loss_func(outputs, labels)
-                bin_loss = loss_func(self.model.bin_outputs, bin_labels)
+                #bin_loss = loss_func(self.model.bin_outputs, bin_labels)
+                bin_loss = self.weighted_loss(loss_func, self.model.bin_outputs, bin_labels)
                 # the masks are in NMCHW format, where M is the number of masks and C = 1
                 # constrain the sum of all mask pixels to be 1
                 mask_sums = torch.sum(self.model.masks, axis=1)
@@ -396,13 +397,25 @@ class Trainer:
                 all_labels[start_idx:end_idx] = bin_labels.cpu().numpy()
                 preds[start_idx:end_idx] = sigmoid(self.model.bin_outputs).round().cpu().numpy()
                 start_idx = end_idx
-                losses.append(loss_func(self.model.bin_outputs, bin_labels).item())
+                #losses.append(loss_func(self.model.bin_outputs, bin_labels).item())
+                losses.append(self.weighted_loss(loss_func, self.model.bin_outputs, bin_labels).item())
 
         if np.isfinite(preds).all():
             score = f1_score(all_labels, preds, average='micro')
         else:
             score = np.nan
         return np.mean(losses), score
+
+    def weighted_loss(self, loss_func, outputs, labels, w=0.7):
+        pos_labels = labels[labels[:, 0] == 0]
+        if pos_labels.shape[0] == 0:
+            return loss_func(outputs, labels)
+        neg_labels = labels[labels[:, 0] == 1]
+        if neg_labels.shape[0] == 0:
+            return loss_func(outputs, labels)
+        pos_outputs = outputs[labels[:, 0] == 0]
+        neg_outputs = outputs[labels[:, 0] == 1]
+        return w*loss_func(pos_outputs, pos_labels) + (1 - w)*loss_func(neg_outputs, neg_labels)
 
     def validate(self):
         loss_func = nn.BCEWithLogitsLoss()

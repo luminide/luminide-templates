@@ -26,6 +26,6 @@ gamma: 0.96
 # data augmentation
 aug_prob: 0.7
 strong_aug: true
-max_cutout: 8
+max_cutout: 0
 
 {%- endif %}
